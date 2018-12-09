@@ -4,7 +4,7 @@ from collections import deque
 
 from anytree import Node, RenderTree
 
-from utils import read_input
+from utils import read_input, parse_args
 
 
 DEBUG = "2 3 0 3 10 11 12 1 1 0 1 99 2 1 1 2"
@@ -90,4 +90,5 @@ def day8(debug):
 
 
 if __name__ == "__main__":
-    day8(False)
+    ARGS = parse_args()
+    day8(ARGS.debug)

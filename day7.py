@@ -2,7 +2,7 @@
 
 import heapq
 
-from utils import read_input
+from utils import read_input, parse_args
 
 
 DEBUG = (
@@ -159,4 +159,5 @@ def day7(debug):
 
 
 if __name__ == "__main__":
-    day7(False)
+    ARGS = parse_args()
+    day7(ARGS.debug)

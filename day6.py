@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from utils import read_input
+from utils import read_input, parse_args
 
 
 def read_location(line):
@@ -81,4 +81,5 @@ def day6(debug):
 
 
 if __name__ == "__main__":
-    day6(False)
+    ARGS = parse_args()
+    day6(ARGS.debug)
