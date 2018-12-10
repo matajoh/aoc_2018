@@ -3,11 +3,12 @@
 import os
 import argparse
 
-PATH_TEMPLATE = "day{}_input.txt"
+PATH_TEMPLATE = "day{}_{}input.txt"
 
-def read_input(day):
+def read_input(day, debug=False):
     """ Read the input for a particular day """
-    path = os.path.join("inputs", PATH_TEMPLATE.format(day))
+    path = PATH_TEMPLATE.format(day, "debug_" if debug else "")
+    path = os.path.join("inputs", path)
     with open(path) as file:
         return file.read()
 

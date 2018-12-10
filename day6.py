@@ -51,10 +51,11 @@ def part2(field, dist_sum):
     print(np.sum(region))
 
 
-def day6(debug):
+def day6():
     """ Solution to day 6 """
+    args = parse_args()
 
-    if debug:
+    if args.debug:
         size = 10
         dist_sum = 32
         lines = "1, 1\n1, 6\n8, 3\n3, 4\n5, 5\n8, 9".split('\n')
@@ -81,5 +82,4 @@ def day6(debug):
 
 
 if __name__ == "__main__":
-    ARGS = parse_args()
-    day6(ARGS.debug)
+    day6()

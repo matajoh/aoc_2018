@@ -123,22 +123,23 @@ def play_game(num_players, last_marble, verbose):
     return max(scores)
 
 
-def day9(debug, verbose):
+def day9():
     """ Solution to Day 9 """
-    if debug:
+    args = parse_args()
+
+    if args.debug:
         games = DEBUG
     else:
         games = TEST
 
     for game in games:
         num_players, last_marble, expected_score = game
-        actual_score = play_game(num_players, last_marble, verbose)
+        actual_score = play_game(num_players, last_marble, args.verbose)
         print(FORMAT.format(num_players, last_marble,
                             actual_score, expected_score))
-        if verbose:
+        if args.verbose:
             break
 
 
 if __name__ == "__main__":
-    ARGS = parse_args()
-    day9(ARGS.debug, ARGS.verbose)
+    day9()

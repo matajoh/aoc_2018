@@ -69,9 +69,11 @@ def part2(root):
     print("Root value:", compute_node_value(root))
 
 
-def day8(debug):
+def day8():
     """ Solution to day 8 """
-    if debug:
+    args = parse_args()
+
+    if args.debug:
         tokens = deque([int(token) for token in DEBUG.split()])
     else:
         tokens = deque([int(token) for token in read_input(8).split()])
@@ -90,5 +92,4 @@ def day8(debug):
 
 
 if __name__ == "__main__":
-    ARGS = parse_args()
-    day8(ARGS.debug)
+    day8()

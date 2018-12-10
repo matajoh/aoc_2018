@@ -131,10 +131,11 @@ def part2(step_lookup, num_workers):
     print(num_seconds)
 
 
-def day7(debug):
+def day7():
     """ Solution to day 7 """
+    args = parse_args()
 
-    if debug:
+    if args.debug:
         lines = DEBUG.split('\n')
         base_time = 0
         num_workers = 2
@@ -159,5 +160,4 @@ def day7(debug):
 
 
 if __name__ == "__main__":
-    ARGS = parse_args()
-    day7(ARGS.debug)
+    day7()
