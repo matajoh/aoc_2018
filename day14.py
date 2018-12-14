@@ -1,5 +1,8 @@
-from utils import parse_args
+""" Solution to day 14 of 2018 Advent of Code """
+
 from copy import copy
+
+from utils import parse_args
 
 SCORES = [3, 7]
 
@@ -25,7 +28,9 @@ TEST_PART2 = [
     ("409551", None)
 ]
 
+
 def print_scoreboard(scores, elf0, elf1):
+    """ Print out the current state of the scoreboard """
     parts = []
     for i, score in enumerate(scores):
         if i == elf0:
@@ -34,71 +39,79 @@ def print_scoreboard(scores, elf0, elf1):
             text = "[{}]".format(score)
         else:
             text = " {} ".format(score)
-        
+
         parts.append(text)
-    
+
     print("".join(parts))
-
-def try_recipes(scores, elf0, elf1):
-    if elf0 == elf1:
-        recipe = scores[elf0]
-    else:
-        recipe = scores[elf0] + scores[elf1]
-
-    if recipe // 10:
-        scores.append(1)
-    
-    scores.append(recipe % 10)
-
-    elf0 = (elf0 + 1 + scores[elf0]) % len(scores)
-    elf1 = (elf1 + 1 + scores[elf1]) % len(scores)
-
-    return elf0, elf1
 
 
 def grow_to_length(scores, length, verbose):
+    """ Grow the scoreboard to the desired length """
     elf0 = 0
     elf1 = 1
     while len(scores) < length:
         if verbose:
             print_scoreboard(scores, elf0, elf1)
 
-        elf0, elf1 = try_recipes(scores, elf0, elf1)
+        recipe = scores[elf0] + scores[elf1]
+
+        if recipe // 10:
+            scores.append(1)
+
+        scores.append(recipe % 10)
+
+        elf0 = (elf0 + 1 + scores[elf0]) % len(scores)
+        elf1 = (elf1 + 1 + scores[elf1]) % len(scores)
 
     return elf0, elf1
 
+
 def part1(scores, start, verbose):
+    """ Solution to part 1 """
     grow_to_length(scores, start+10, verbose)
     parts = [str(score) for score in scores[start:start + 10]]
     return "".join(parts)
 
-def part2(scores, sequence):
-    sequence = [int(char) for char in sequence]
-    
+
+def check_for_match(scores, sequence):
+    """ Check if the end of the list of scores matches the sequence """
+    start = len(scores) - len(sequence)
+    for i, score in enumerate(sequence):
+        if score != scores[i + start]:
+            return False
+
+    return True
+
+
+def part2(scores, sequence_text):
+    """ Solution to part 2 """
+    sequence = [int(char) for char in sequence_text]
+
     elf0, elf1 = grow_to_length(scores, len(sequence), False)
 
-    best_match = 0
     while True:
-        if len(scores) % 10000 == 0:
-            print(len(scores), best_match)
+        if len(scores) % 100000 == 0:
+            print(len(scores))
 
-        start = len(scores) - len(sequence)
-        found = True
-        for i, score in enumerate(sequence):
-            best_match = max([best_match, i])
-            if score != scores[i + start]:
-                found = False
+        recipe = scores[elf0] + scores[elf1]
+
+        if recipe // 10:
+            scores.append(1)
+            if check_for_match(scores, sequence):
                 break
-        
-        if found:
+
+        scores.append(recipe % 10)
+        if check_for_match(scores, sequence):
             break
-        
-        elf0, elf1 = try_recipes(scores, elf0, elf1)
-    
+
+        elf0 = (elf0 + 1 + scores[elf0]) % len(scores)
+        elf1 = (elf1 + 1 + scores[elf1]) % len(scores)
+
     return len(scores) - len(sequence)
 
 
 def day14():
+    """ Solution to day 14 """
     args = parse_args()
     cases = DEBUG_PART1 if args.debug else TEST_PART1
 
@@ -114,6 +127,7 @@ def day14():
         scores = copy(SCORES)
         actual = part2(scores, sequence)
         print(sequence, ":", actual, "(", expected, ")")
+
 
 if __name__ == "__main__":
     day14()
