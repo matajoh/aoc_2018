@@ -84,31 +84,64 @@ class Unit:
                            
             if len(path) < min_dist:
                 min_dist = len(path)
-                min_targets = [goal]
+                min_targets = [(goal, path)]
             elif len(path) == min_dist:
-                min_targets.append(goal)
+                min_targets.append((goal, path))
         
         if not min_targets:
-            return None, min_dist
+            return None, None, min_dist
 
         min_targets.sort()
-        return min_targets[0], min_dist
-        
+        goal, path = min_targets[0]
+        path = list(reversed(path))
+        return goal, path, min_dist
+
+    def get_best_move(self, path):
+        assert path[0] == self.index
+        dist = len(path)
+        row0, col0 = path[0]
+        row1 = row0
+        col1 = col0
+        index = 1
+        while row1 == row0 and index < dist:
+            row1, col1 = path[index]
+            index += 1
+
+        if row1 < row0:
+            goal = (row1, col1)
+            paths = self.battle.find_all_paths(self.index, goal, index)
+            moves = [path[1] for path in paths]
+            moves.sort()
+            return moves[0]
+
+        row1 = row0
+        col1 = col0
+        index = 1
+        while col1 == col0 and index < dist:
+            row1, col1 = path[index]
+            index += 1
+
+        if index == 1:
+            return path[1]
+
+        goal = (row1, col1)
+        paths = self.battle.find_all_paths(self.index, (row1, col1), index)
+        moves = [path[1] for path in paths]
+        moves.sort()
+        return moves[0]
     
     def move(self, goals):
-        goal, dist = self.find_nearest(goals)
+        goal, path, dist = self.find_nearest(goals)
 
         if goal is None:
             return
 
-        moves = []
-        for neighbor in neighbors(self.index):
-            paths = self.battle.find_all_paths(neighbor, goal, dist - 2, [])
-            if paths:
-                moves.append(neighbor)
-
-        moves.sort()
-        self.battle.move(self, moves[0])
+        if len(path) > 2:
+            best_move = self.get_best_move(path)
+        else:
+            best_move = path[1]
+                    
+        self.battle.move(self, best_move)
     
     def take_turn(self):
         in_range = self.battle.find_in_range(self.enemy)
@@ -194,6 +227,7 @@ class Battle:
         g_scores[start] = 0
         f_scores = {}
         f_scores[start] = heuristic(start, goal)
+        paths = []
         while open_set:
             current = open_set[0]
             f_score = f_scores[current]
@@ -230,25 +264,36 @@ class Battle:
             
         return None         
 
-    def find_all_paths(self, node, goal, length, path):
-        if node in path:
-            return []
+    def find_all_paths(self, node, goal, max_dist):
+        paths = []
 
-        path.append(node)
-        if length == 0:
-            if node == goal:
-                return [path]
-            
-            return []
-        else:
-            if self._walls[node] or self._units[node] is not None:
-                return []
-            
-            paths = []
-            for neighbor in neighbors(node):
-                paths += self.find_all_paths(neighbor, goal, length-1, copy(path))
-           
+        dist = heuristic(node, goal)
+        if dist > max_dist:
             return paths
+        
+        partials = []
+        heapq.heappush(partials, (dist, [node]))
+        while partials:
+            _, current = heapq.heappop(partials)
+            if current[-1] == goal:
+                paths.append(current)
+                continue
+
+            limit = max_dist - len(current)
+            for neighbor in neighbors(current[-1]):
+                if neighbor in current:
+                    continue
+                
+                if not self.is_clear(neighbor):
+                    continue
+
+                dist = heuristic(neighbor, goal)
+                if dist <= limit:
+                    path = copy(current)
+                    path.append(neighbor)
+                    heapq.heappush(partials, (dist, path))
+                    
+        return paths
     
     def __repr__(self):
         return self.to_string()
