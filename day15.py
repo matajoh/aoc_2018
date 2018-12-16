@@ -52,14 +52,18 @@ def reconstruct_path(came_from, current):
 
 def heuristic(first, second):
     """ Manhattan distance heuristic for A-star search """
-    return np.abs(first[0]-second[0]) + np.abs(first[1]-second[1])
+    return abs(first[0]-second[0]) + abs(first[1]-second[1])
 
 
 def neighbors(point):
     """ Return the manhattan neighbors of a point """
     row, col = point
-    for drow, dcol in [(-1, 0), (0, -1), (0, 1), (1, 0)]:
-        yield row + drow, col + dcol
+    return [
+        (row - 1, col),
+        (row, col-1),
+        (row, col+1),
+        (row+1, col)
+    ]
 
 
 class Unit:
@@ -250,17 +254,17 @@ class Battle:
 
     def find_min_path(self, start, goal):
         """ Finds the minimum path from the start to the goal """
-        closed_set = []
-        open_set = [start]
+        closed_set = set()
+        open_set = set([start])
         came_from = {}
         g_scores = {}
         g_scores[start] = 0
         f_scores = {}
         f_scores[start] = heuristic(start, goal)
         while open_set:
-            current = open_set[0]
-            f_score = f_scores[current]
-            for point in open_set[1:]:
+            current = None
+            f_score = self._max_dist
+            for point in open_set:
                 if f_scores[point] < f_score:
                     f_score = f_scores[point]
                     current = point
@@ -269,7 +273,7 @@ class Battle:
                 return reconstruct_path(came_from, current)
 
             open_set.remove(current)
-            closed_set.append(current)
+            closed_set.add(current)
 
             if self._walls[current]:
                 continue
@@ -283,7 +287,7 @@ class Battle:
 
                 tentative_g_score = g_scores[current] + 1
                 if neighbor not in open_set:
-                    open_set.append(neighbor)
+                    open_set.add(neighbor)
                 elif tentative_g_score >= g_scores[neighbor]:
                     continue
 
@@ -455,7 +459,6 @@ def part2(debug, verbose):
         lines = deque(lines.split('\n'))
         outcomes1 = [(0, None)]
 
-    print("\n\nPart 2")
     case = 0
     while lines:
         battle, expected = read_start_state(lines)
@@ -492,7 +495,7 @@ def day15():
     print("Part 1")
     part1(args.debug, args.verbose)
 
-    print("Part 2")
+    print("\n\nPart 2")
     part2(args.debug, args.verbose)
 
 
