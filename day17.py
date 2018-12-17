@@ -1,4 +1,6 @@
 from collections import deque
+import heapq
+import itertools
 
 import numpy as np
 
@@ -9,6 +11,38 @@ CLAY = ord('#')
 WATER = ord('~')
 SPRING = ord('+')
 DRIED_SAND = ord('|')
+
+class Drop:
+    def __init__(self, pos, flow_left, index):
+        row, col = pos
+        self.pos = pos
+        self.left = (row, col-1)
+        self.right = (row, col+1)
+        self.down = (row+1, col)
+        self.flow_left = flow_left
+        self.index = index
+    
+    def __lt__(self, other):
+        return self.index < other.index
+    
+    def __repr__(self):
+        return "Drop({}, flow_left={})".format(self.pos, self.flow_left)
+    
+    def drop(self):
+        return Drop(self.down, None, self.index)
+    
+    def flow(self):
+        if self.flow_left:
+            return Drop(self.left, True, self.index)
+        
+        return Drop(self.right, False, self.index)
+    
+    def split(self):
+        assert self.flow_left is None
+        return [
+            Drop(self.pos, True, self.index),
+            Drop(self.pos, False, self.index)
+        ]
 
 class Clay:
     def __init__(self, spec):
@@ -92,80 +126,110 @@ class Ground:
 
         for clay in clays:
             clay.draw(self._blocks, self.top, self.left)
-    
-    def _find_left(self, row, col, blocks):
+
+    def _find_left(self, pos, blocks):
+        row, col = pos
         col -= 1
-        print("Looking for", [chr(block) for block in blocks], "to the left of", col)
         while col >= 0:
+            if self._blocks[row+1, col] in (SAND, DRIED_SAND):
+                return None
+
             if self._blocks[row, col] in blocks:
-                print("found at", col)
                 return col
-            
+
             col -= 1
         
         return None
-    
-    def _find_right(self, row, col, blocks):
+
+    def _find_right(self, pos, blocks):
+        row, col = pos
         col += 1
-        print("Looking for", [chr(block) for block in blocks], "to the right of", col)
         while col < self.columns:
+            if self._blocks[row+1, col] in (SAND, DRIED_SAND):
+                return None
+
             if self._blocks[row, col] in blocks:
-                print("found at", col)
                 return col
 
             col += 1
         
         return None
-    
-    def add_water(self, report=None):
-        settled = True
-        while settled:
-            row, col = 0 - self.top, 500 - self.left
-            settled = False
-            while row < self.rows - 1:
-                print(row, col)
-                if self._blocks[row, col] == SAND:
-                    print("wetting sand")
-                    self._blocks[row, col] = DRIED_SAND
-                elif self._blocks[row+1, col] in (SAND, DRIED_SAND):
-                    print("drop down")
-                    row += 1
-                else:
-                    lcol = self._find_left(row, col, (SAND, CLAY, WATER))
-                    if lcol:
-                        if self._blocks[row, lcol] == SAND:
-                            print("sand to left")
-                            col = lcol
-                            continue
-                        
-                        rcol = self._find_right(row, col, (SAND, CLAY, WATER))
-                        if rcol:
-                            if self._blocks[row, rcol] == SAND:
-                                print("sand to right")
-                                col = rcol
-                                continue
-                            
-                            print("valid square")
-                            self._blocks[row, col] = WATER
-                            settled = True
-                            break
-                        else:
-                            print("flowing to right")
-                            col = self._find_right(row, col, (DRIED_SAND,))
-                    else:
-                        rcol = self._find_right(row, col, (SAND, CLAY, WATER))
-                        if self._blocks[row, rcol] == SAND:
-                            print("sand to right")
-                            col = rcol
-                            continue
-                        
-                        print("flowing to left")
-                        col = self._find_left(row, col, (DRIED_SAND))
+      
+    def add_water(self, report, verbose):
+        spring = (0- self.top, 500 - self.left)
+        counter = itertools.count()
+        drops = []
 
-            
+        def add_spring():
+            index = next(counter)
             num_water = np.sum(self._blocks == WATER)
-            if report and num_water % report == 0:
-                print(self)
+            if index % report == 0:
+                print("Drop", index, ":", num_water)
+                if verbose:
+                    print(self, "\n")
+
+            heapq.heappush(drops, Drop(spring, None, index))
+
+        add_spring()
+        while drops:
+            drop = heapq.heappop(drops)
+
+            assert self._blocks[drop.pos] != SAND
+            
+            while drop.down[0] < self.rows:
+                if self._blocks[drop.down] in (SAND, DRIED_SAND):
+                    assert drop.flow_left is None
+                    drop = drop.drop()
+                    self._blocks[drop.pos] = DRIED_SAND
+                else:
+                    break
+            
+            if drop.down[0] == self.rows:
+                continue
+
+            # water or clay beneath
+            if drop.flow_left is None:
+                for flow in drop.split():
+                    heapq.heappush(drops, flow)
+            elif drop.flow_left:
+                while drop.pos[0] >= 0:
+                    if self._blocks[drop.down] in (SAND, DRIED_SAND):
+                        heapq.heappush(drops, Drop(drop.pos, None, drop.index))
+                        break
+                    elif self._blocks[drop.left] in (SAND, DRIED_SAND):
+                        drop = drop.flow()
+                        self._blocks[drop.pos] = DRIED_SAND
+                    else:
+                        break
+
+                if self._blocks[drop.down] in (SAND, DRIED_SAND):
+                    continue
+
+                assert self._blocks[drop.left] in (WATER, CLAY)
+                rcol = self._find_right(drop.pos, (WATER, CLAY))
+                if rcol:
+                    row, col = drop.pos                            
+                    while col < rcol:
+                        self._blocks[row, col] = WATER
+                        col += 1
+
+                    add_spring()
+                else:
+                    continue
+            else:
+                while drop.pos[0] < self.columns:
+                    if self._blocks[drop.down] in (SAND, DRIED_SAND):
+                        heapq.heappush(drops, Drop(drop.pos, None, drop.index))
+                        break
+                    elif self._blocks[drop.right] in (SAND, DRIED_SAND):
+                        drop = drop.flow()
+                        self._blocks[drop.pos] = DRIED_SAND
+                    else:
+                        break
+
+    @property    
+    def reachable_tiles(self):
+        return np.sum(self._blocks == WATER) + np.sum(self._blocks == DRIED_SAND)
 
     def __repr__(self):
         lines = [[chr(block) for block in row] for row in self._blocks]
@@ -206,7 +270,13 @@ def day17():
         expected = parse_repr(lines)
         assert actual == expected, "{}\n{}".format(actual, expected)
     
-    ground.add_water(5 if args.verbose else None)
+    ground.add_water(5, args.verbose)
+    if args.verbose:
+        print(ground)
+    
+    print(ground)
+    print("Part 1")
+    print("Reachable tiles:", ground.reachable_tiles)
 
 if __name__ == "__main__":
     day17()
