@@ -10,39 +10,8 @@ SAND = ord('.')
 CLAY = ord('#')
 WATER = ord('~')
 SPRING = ord('+')
-DRIED_SAND = ord('|')
+WET_SAND = ord('|')
 
-class Drop:
-    def __init__(self, pos, flow_left, index):
-        row, col = pos
-        self.pos = pos
-        self.left = (row, col-1)
-        self.right = (row, col+1)
-        self.down = (row+1, col)
-        self.flow_left = flow_left
-        self.index = index
-    
-    def __lt__(self, other):
-        return self.index < other.index
-    
-    def __repr__(self):
-        return "Drop({}, flow_left={})".format(self.pos, self.flow_left)
-    
-    def drop(self):
-        return Drop(self.down, None, self.index)
-    
-    def flow(self):
-        if self.flow_left:
-            return Drop(self.left, True, self.index)
-        
-        return Drop(self.right, False, self.index)
-    
-    def split(self):
-        assert self.flow_left is None
-        return [
-            Drop(self.pos, True, self.index),
-            Drop(self.pos, False, self.index)
-        ]
 
 class Clay:
     def __init__(self, spec):
@@ -123,113 +92,107 @@ class Ground:
         self._blocks = np.zeros((self.rows, self.columns), np.int32)
         self._blocks[:] = SAND
         self._blocks[0, 500 - self.left] = SPRING
-
+        self._min_row = 1
+        self._max_row = 3
+        self._min_col = 499 - self.left
+        self._max_col = 502 - self.left
+        self._buffer = np.zeros_like(self._blocks)
         for clay in clays:
             clay.draw(self._blocks, self.top, self.left)
 
-    def _find_left(self, pos, blocks):
-        row, col = pos
-        col -= 1
-        while col >= 0:
-            if self._blocks[row+1, col] in (SAND, DRIED_SAND):
-                return None
+    def _is_drop(self, top):
+        return top == WET_SAND
+    
+    def _is_flow_left(self, right, bottom_right):
+        if right == WET_SAND:
+            return bottom_right in (WATER, CLAY)
+    
+    def _is_flow_right(self, left, bottom_left):
+        if left == WET_SAND:
+            return bottom_left in (WATER, CLAY)
+    
+    def _tile_is_wet(self, row, col):
+        tile = self._blocks[row, col]
+        if tile == SAND:
+            if self._is_drop(self._blocks[row-1, col]):
+                return True
 
-            if self._blocks[row, col] in blocks:
-                return col
-
-            col -= 1
+            if self._is_flow_left(self._blocks[row, col+1], self._blocks[row+1, col+1]):
+                return True
+            
+            if self._is_flow_right(self._blocks[row, col-1], self._blocks[row+1, col-1]):
+                return True
         
-        return None
-
-    def _find_right(self, pos, blocks):
-        row, col = pos
-        col += 1
-        while col < self.columns:
-            if self._blocks[row+1, col] in (SAND, DRIED_SAND):
-                return None
-
-            if self._blocks[row, col] in blocks:
-                return col
-
-            col += 1
-        
-        return None
+        return False
       
-    def add_water(self, report, verbose):
-        spring = (0- self.top, 500 - self.left)
-        counter = itertools.count()
-        drops = []
+    def add_water(self):
+        self._blocks[1 - self.top, 500 - self.left] = WET_SAND
+        np.copyto(self._buffer, self._blocks)
 
-        def add_spring():
-            index = next(counter)
-            num_water = np.sum(self._blocks == WATER)
-            if index % report == 0:
-                print("Drop", index, ":", num_water)
-                if verbose:
-                    print(self, "\n")
+        min_row = self._max_row
+        min_col = self._max_col
+        max_col = self._min_col
+        max_row = self._min_row
+        new_tiles = False
+        for row in range(self._min_row, self._max_row):
+            for col in range(self._min_col, self._max_col):
+                if self._blocks[row, col] == WET_SAND:
+                    min_col = col if col < min_col else min_col
+                    max_col = col if col > max_col else max_col
+                elif self._tile_is_wet(row, col):
+                    new_tiles = True
+                    min_row = row if row < min_row else min_row
+                    max_row = row if row > max_row else max_row
+                    min_col = col if col < min_col else min_col
+                    max_col = col if col > max_col else max_col
+                    self._buffer[row, col] = WET_SAND
+        
+        self._min_row = max(min_row - 2, 1)
+        self._max_row = min(max_row + 2, self.rows-1)
+        self._min_col = max(min_col - 2, 0)
+        self._max_col = min(max_col + 2, self.columns)
 
-            heapq.heappush(drops, Drop(spring, None, index))
+        if self._max_row == self.rows - 1:
+            for col in range(self.columns):
+                if self._buffer[-1, col] == SAND:
+                    if self._buffer[-2, col] == WET_SAND:
+                        new_tiles = True
+                        self._buffer[-1, col] = WET_SAND
 
-        add_spring()
-        while drops:
-            drop = heapq.heappop(drops)
-
-            assert self._blocks[drop.pos] != SAND
-            
-            while drop.down[0] < self.rows:
-                if self._blocks[drop.down] in (SAND, DRIED_SAND):
-                    assert drop.flow_left is None
-                    drop = drop.drop()
-                    self._blocks[drop.pos] = DRIED_SAND
-                else:
-                    break
-            
-            if drop.down[0] == self.rows:
-                continue
-
-            # water or clay beneath
-            if drop.flow_left is None:
-                for flow in drop.split():
-                    heapq.heappush(drops, flow)
-            elif drop.flow_left:
-                while drop.pos[0] >= 0:
-                    if self._blocks[drop.down] in (SAND, DRIED_SAND):
-                        heapq.heappush(drops, Drop(drop.pos, None, drop.index))
-                        break
-                    elif self._blocks[drop.left] in (SAND, DRIED_SAND):
-                        drop = drop.flow()
-                        self._blocks[drop.pos] = DRIED_SAND
-                    else:
-                        break
-
-                if self._blocks[drop.down] in (SAND, DRIED_SAND):
-                    continue
-
-                assert self._blocks[drop.left] in (WATER, CLAY)
-                rcol = self._find_right(drop.pos, (WATER, CLAY))
-                if rcol:
-                    row, col = drop.pos                            
-                    while col < rcol:
-                        self._blocks[row, col] = WATER
-                        col += 1
-
-                    add_spring()
-                else:
-                    continue
-            else:
-                while drop.pos[0] < self.columns:
-                    if self._blocks[drop.down] in (SAND, DRIED_SAND):
-                        heapq.heappush(drops, Drop(drop.pos, None, drop.index))
-                        break
-                    elif self._blocks[drop.right] in (SAND, DRIED_SAND):
-                        drop = drop.flow()
-                        self._blocks[drop.pos] = DRIED_SAND
-                    else:
-                        break
+        if not new_tiles:
+            return False
+              
+        for row in reversed(range(self._min_row, self._max_row)):
+            start = None
+            for col in range(self.columns):
+                tile = self._buffer[row, col]
+                bottom = self._buffer[row+1, col]
+                if tile == WET_SAND:
+                    left = self._buffer[row, col-1]
+                    if left == CLAY and bottom in (CLAY, WATER):
+                        start = col
+                elif tile == SAND:
+                    start = None
+                elif bottom not in (CLAY, WATER):
+                    start = None
+                elif tile == CLAY:
+                    if start:
+                        for basin_col in range(start, col):
+                            self._buffer[row, basin_col] = WATER
+                        
+                        start = None
+                
+               
+        self._blocks, self._buffer = self._buffer, self._blocks
+        return True
+    
+    @property
+    def active_region(self):
+        return self._min_row, self._min_col, self._max_row, self._max_col
 
     @property    
     def reachable_tiles(self):
-        return np.sum(self._blocks == WATER) + np.sum(self._blocks == DRIED_SAND)
+        return np.sum(self._blocks == WATER) + np.sum(self._blocks == WET_SAND)
 
     def __repr__(self):
         lines = [[chr(block) for block in row] for row in self._blocks]
@@ -270,11 +233,15 @@ def day17():
         expected = parse_repr(lines)
         assert actual == expected, "{}\n{}".format(actual, expected)
     
-    ground.add_water(5, args.verbose)
-    if args.verbose:
-        print(ground)
+    iteration = 0
+    while ground.add_water():
+        iteration += 1
+        if iteration % 5 == 0 and args.verbose:
+            print(iteration, ":", ground.reachable_tiles, ground.active_region)
+  
+    with open("ground.txt", "w") as file:
+        file.write(str(ground))
     
-    print(ground)
     print("Part 1")
     print("Reachable tiles:", ground.reachable_tiles)
 
