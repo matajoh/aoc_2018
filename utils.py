@@ -24,6 +24,7 @@ def parse_args():
     parser = argparse.ArgumentParser("Advent of Code")
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--verbose", action="store_true")
+    parser.add_argument("--video", action="store_true")
     parser.add_argument("--num_video_frames", type=int, default=0)
     return parser.parse_args()
 

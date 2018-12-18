@@ -4,7 +4,7 @@ from collections import deque
 
 import numpy as np
 
-from utils import read_input, parse_args
+from utils import read_input, parse_args, VideoBuilder
 
 DEBUG_PART1_OUTCOMES = [
     27730,
@@ -32,6 +32,12 @@ GOBLIN = ord('G')
 DEFAULT_HEALTH = 200
 DEFAULT_ATTACK = 3
 
+COLOR_MAP = {
+    CLEAR: (0, 0, 0),
+    WALL: (255, 255, 255),
+    ELF: (0, 255, 0),
+    GOBLIN: (255, 0, 0)
+}
 
 class ElfException(Exception):
     """ Exception thrown when an elf dies """
@@ -188,7 +194,8 @@ class Battle:
 
     def __init__(self, lines,
                  elf_attack_power=DEFAULT_ATTACK,
-                 raise_on_elf_death=False):
+                 raise_on_elf_death=False,
+                 build_video=False):
         lines = [[ord(char) for char in line] for line in lines]
         lines = np.array(lines)
 
@@ -205,6 +212,13 @@ class Battle:
                 attack_power = elf_attack_power if spec == ELF else DEFAULT_ATTACK
                 self._units[index] = Unit(
                     spec, self, index, attack=attack_power)
+
+        if build_video:
+            self._builder = VideoBuilder("day15.mp4", self._walls, COLOR_MAP)
+            self._state = np.zeros_like(self._walls, np.int32)
+        else:
+            self._builder = None
+            self._state = None
 
     def to_string(self, omit_health=False):
         """ Converts the battle to a string representation """
@@ -327,16 +341,35 @@ class Battle:
     def __getitem__(self, key):
         return self._units[key]
 
+    def _add_frame(self):
+        self._state[self._walls == 1] = WALL
+        self._state[self._walls == 0] = CLEAR
+        for unit in self._units.flatten():
+            if unit is None or not unit.is_alive:
+                continue
+
+            self._state[unit.index] = unit.race
+
+        self._builder.add_frame(self._state)
+
     def round(self):
         """ Performs a round of combat """
+        if self._builder:
+            self._add_frame()
+
         units = self._units.flatten().tolist()
         for i, unit in enumerate(units):
             if unit is None or not unit.is_alive:
                 continue
 
+            self._state[unit.index] = unit.race
             if unit.take_turn():
                 if i == len(units) - 1:
                     self._num_rounds += 1
+
+                if self._builder:
+                    self._add_frame()
+                    self._builder.close()
 
                 return True
 
@@ -372,7 +405,7 @@ def read_start_state(lines):
 
         start_lines.append(line)
 
-    return Battle(start_lines), "\n".join(start_lines)
+    return "\n".join(start_lines)
 
 
 def read_end_state(lines):
@@ -404,7 +437,7 @@ def run_battle(battle, verbose):
         print(battle)
 
 
-def part1(debug, verbose):
+def part1(debug, verbose, build_video):
     """ Solution to part 1 """
     if debug:
         lines = read_input(15, True)
@@ -417,7 +450,8 @@ def part1(debug, verbose):
 
     case = 0
     while lines:
-        battle, expected = read_start_state(lines)
+        expected = read_start_state(lines)
+        battle = Battle(expected.split('\n'), build_video=build_video)
         assert battle.to_string(True) == expected
 
         if lines:
@@ -429,6 +463,7 @@ def part1(debug, verbose):
 
         if expected:
             assert str(battle) == expected
+
         race, hp_sum = battle.winners
         print("Combat ends after", battle.num_rounds, "full rounds")
         print(race, "win with", hp_sum, "total hit points left")
@@ -461,8 +496,7 @@ def part2(debug, verbose):
 
     case = 0
     while lines:
-        battle, expected = read_start_state(lines)
-        assert battle.to_string(True) == expected
+        expected = read_start_state(lines)
         read_end_state(lines)
 
         attack_power = 4
@@ -493,7 +527,10 @@ def day15():
     args = parse_args()
 
     print("Part 1")
-    part1(args.debug, args.verbose)
+    part1(args.debug, args.verbose, args.video)
+
+    if args.video:
+        return
 
     print("\n\nPart 2")
     part2(args.debug, args.verbose)
