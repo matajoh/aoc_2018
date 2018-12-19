@@ -1,5 +1,7 @@
 """ Solution to day 19 of the 2018 Advent of Code """
 
+import numpy as np
+
 from utils import read_input, parse_args
 
 
@@ -221,11 +223,15 @@ def test_operations():
 class CPU:
     """ Class representing the CPU """
 
-    def __init__(self, registers=(0, 0, 0, 0, 0, 0)):
+    def __init__(self, registers=(0, 0, 0, 0, 0, 0), trace=False):
         self._registers = list(registers)
         self._ip = 0
+        if trace:
+            self._data = []
+        else:
+            self._data = None
 
-    def run_program(self, program, verbose):
+    def run_program(self, program, verbose, num_steps=None):
         """ Run a program on the CPU """
         self._ip = 0
 
@@ -233,6 +239,7 @@ class CPU:
         binding = program[0].args[0]
         program = program[1:]
 
+        step = 0
         while self._ip < len(program):
             inst = program[self._ip]
             if inst.op_code == "#ip":
@@ -246,7 +253,10 @@ class CPU:
             if verbose:
                 before = str(self._registers)
 
-            self._registers = OPS[inst.op_code](self._registers, inst.args)
+            if self._data is not None:
+                self._data.append((self._ip, tuple(self._registers)))
+
+            self._registers = inst.execute(self._registers)
             if verbose:
                 print("ip={}".format(self._ip), before, inst, self._registers)
 
@@ -255,7 +265,19 @@ class CPU:
 
             self._ip += 1
 
-        return self._registers[0]
+            step += 1
+            if num_steps and step >= num_steps:
+                break
+
+    @property
+    def stack(self):
+        """ The current values of the CPU's registers """
+        return tuple(self._registers)
+
+    @property
+    def trace(self):
+        """ Returns a trace of the program """
+        return self._data
 
 
 class Instruction:
@@ -276,17 +298,41 @@ class Instruction:
         args = [str(arg) for arg in self.args]
         return "{} {}".format(self.op_code, " ".join(args))
 
+    def execute(self, registers):
+        """ Execute this instruction """
+        return OPS[self.op_code](registers, self.args)
 
-def part1(program, verbose):
-    """ Solution to part 1 """
+
+def simulate(program, verbose):
+    """ Simulate the CPU on the instruction stack """
     cpu = CPU()
-    return cpu.run_program(program, verbose)
+    cpu.run_program(program, verbose)
+    return cpu.stack[0]
+
+
+def decompiled(longer_version):
+    """ Decompiled (and optimized) version of the instruction set """
+    product = 950
+    if longer_version:
+        product += 10550400
+
+    result = 0
+    limit = int(np.sqrt(product)) + 1  # optimization
+    for i in range(0, limit):
+        factor = i + 1
+        if product % factor == 0:
+            result += product // factor  # optimization
+            result += factor
+
+    return result
 
 
 def part2(program, verbose):
     """ Solution to part 2 """
     cpu = CPU((1, 0, 0, 0, 0, 0))
-    return cpu.run_program(program, verbose)
+    cpu.run_program(program, verbose, 100)
+    print(cpu.stack[-1])
+    print(decompiled(True))
 
 
 def day19():
@@ -297,10 +343,12 @@ def day19():
     program = [Instruction(line.strip()) for line in lines]
 
     print("Part 1")
-    print(part1(program, args.verbose))
+    expected = simulate(program, args.verbose)
+    actual = decompiled(False)
+    print("Simulation:", expected, "Decompiled:", actual)
 
     print("Part 2")
-    print(part2(program, args.verbose))
+    print("Decompiled:", decompiled(True))
 
 
 if __name__ == "__main__":
