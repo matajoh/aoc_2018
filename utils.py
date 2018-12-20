@@ -83,7 +83,9 @@ class VideoBuilder:
         """ Add a frame to the video using the state and the color map """
         with Image.fromarray(state, 'P') as frame:
             frame.putpalette(self._palette)
-            frame = frame.resize((self._width, self._height))
+            if frame.width != self._width:
+                frame = frame.resize((self._width, self._height))
+
             frame.save(self._ffmpeg.stdin, format='png')
 
     def close(self):

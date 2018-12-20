@@ -19,11 +19,13 @@ COLOR_MAP = {
     ord(SPRING): (255, 255, 255),
     ord(FLOWING): (0, 255, 255)
 }
+FRAME_SKIP = 2
 
 
 DOWN = Point(1, 0)
 LEFT = Point(0, -1)
 RIGHT = Point(0, 1)
+
 
 
 class Drop(Point):
@@ -182,27 +184,33 @@ class Ground:
                 state[clay.row, clay.col - self._min_col] = ord(CLAY)
             state[0, 500 - self._min_col] = ord(SPRING)
 
-            builder = VideoBuilder("day17.mp4", state, COLOR_MAP)
+            builder = VideoBuilder("day17.mp4", state, COLOR_MAP, 60)
         else:
             state = None
             builder = None
 
         frontier = [Drop(1, 500)]
         last_report = 0
+        frame_skip = 0
         while frontier:
             water = frontier.pop()
             outflow = water.flow(self._clay, self._water,
                                  self._flowing, self._rows)
 
             if build_video:
-                for flowing in self._flowing:
-                    state[flowing.row, flowing.col -
-                          self._min_col] = ord(FLOWING)
+                if frame_skip:
+                    frame_skip -= 1
+                else:
+                    for flowing in self._flowing:
+                        col = flowing.col - self._min_col
+                        state[flowing.row, col] = ord(FLOWING)
 
-                for water in self._water:
-                    state[water.row, water.col - self._min_col] = ord(WATER)
+                    for water in self._water:
+                        col = water.col - self._min_col
+                        state[water.row, col] = ord(WATER)
 
-                builder.add_frame(state)
+                    builder.add_frame(state)
+                    frame_skip = FRAME_SKIP
 
             if verbose and self.reachable_tiles - last_report > 5:
                 print(self.reachable_tiles)
