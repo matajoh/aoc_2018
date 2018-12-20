@@ -18,6 +18,17 @@ def read_input(day, debug=False):
         return file.read()
 
 
+TEMP_DIR = "temp"
+
+
+def temp_file(path):
+    """ Return a path to a temporary file """
+    if not os.path.exists(TEMP_DIR):
+        os.makedirs(TEMP_DIR)
+
+    return os.path.join(TEMP_DIR, path)
+
+
 def parse_args():
     """ Parse argument from the command line """
 

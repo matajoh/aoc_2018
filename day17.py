@@ -1,16 +1,15 @@
-from collections import deque, namedtuple
-import heapq
-import itertools
+import os
+from collections import deque
 
 import numpy as np
 
-from utils import read_input, parse_args
+from utils import read_input, parse_args, temp_file
 
-SAND = ord('.')
-CLAY = ord('#')
-WATER = ord('~')
-SPRING = ord('+')
-WET_SAND = ord('|')
+SAND = '.'
+CLAY = '#'
+WATER = '~'
+SPRING = '+'
+FLOWING = '|'
 
 class Point:
     def __init__(self, row, col):
@@ -19,10 +18,25 @@ class Point:
         self._hash = (row, col).__hash__()
     
     def __eq__(self, other):
-        return !(self.row != other.row or self.col != other.col)
+        return not (self.row != other.row or self.col != other.col)
     
     def __hash__(self):
         return self._hash
+    
+    def __getitem__(self, key):
+        if key == 0:
+            return self._row
+        
+        if key == 1:
+            return self._col
+        
+        raise IndexError("Invalid index")
+    
+    def __len__(self):
+        return 2
+    
+    def __repr__(self):
+        return "{}(row={}, col={})".format(type(self).__name__, self._row, self._col)
     
     @property
     def row(self):
@@ -63,10 +77,13 @@ class Drop(Point):
     def right(self, col):
         self._right = col
     
-    def flow(self, clay, water, flowing):
+    def flow(self, clay, water, flowing, max_row):
+        if self in water:
+            return None
+
         flowing.add(self)
         down = self + DOWN
-        if down in (clay | water):
+        if down in clay or down in water:
             if self._flowed:
                 if self._left and self._right:
                     for col in range(self._left, self._right + 1):
@@ -75,12 +92,12 @@ class Drop(Point):
                         water.add(point)
 
                 return None
-            else:
-                self._flowed = True
-                return self, Flow(self.row, self.col, True, self), Flow(self.row, self.col, False, self)
 
-        elif down not in flowing:
-            return down
+            self._flowed = True
+            return self, Flow(self.row, self.col, False, self), Flow(self.row, self.col, True, self)
+
+        elif down not in flowing and down.row < max_row:
+            return [self, down]
         
         return None
 
@@ -94,47 +111,57 @@ class Flow(Point):
     def __add__(self, other):
         return Flow(self.row + other.row, self.col + other.col, self._flow_left, self._drop)
 
-    def flow(self, clay, water, flowing):
+    def flow(self, clay, water, flowing, max_row):
+        if self in water:
+            if self._flow_left:
+                self._drop.left = self.col
+            else:
+                self._drop.right = self.col
+
+            return None
+
         flowing.add(self)
         down = self + DOWN
         if self._flow_left:
             left = self + LEFT
-            if left in clay:
+            if left in clay or left in water:
                 self._drop.left = self.col
                 return None
 
-            if down in (clay | water):
-                return left
+            if down in clay or down in water:
+                return [left]
         else:
             right = self + RIGHT
-            if right in clay:
+            if right in clay or right in water:
                 self._drop.right = self.col
                 return None
             
-            if down in (clay | water):
-                return right            
+            if down in clay or down in water:
+                return [right]            
 
         if down in flowing:
             return None
         
-        return Drop(down.row, down.col)
+        if down.row < max_row:
+            return [Drop(self.row, self.col)]
+        
+        return None
 
 
-def line_to_points(self, line):
+def line_to_points(line):
+    parts = line.split(',')
+    val0 = int(parts[0][2:])
+    parts = parts[1].strip()[2:].split('..')
+    val1 = int(parts[0])
+    val2 = int(parts[1])
     if line.startswith('x'):
-        x=495, y=2..7
-        parts = line.split(',')
-        x = int(parts[0][2:])
-        parts = parts[1][2:].split('..')
-        y0 = int(parts[0])
-        y1 = int(parts[1])
-        for y in range(y0, y1 + 1):
-            yield y, x
-    
-    if line.startswith('y'):
-        pass
-    
-    raise ValueError("Invalid input: " + line)
+        for y in range(val1, val2 + 1):
+            yield Point(y, val0)
+    elif line.startswith('y'):
+        for x in range(val1, val2 + 1):
+            yield Point(val0, x)
+    else:
+        raise ValueError("Invalid input: " + line)
 
         
 class Ground:
@@ -142,20 +169,83 @@ class Ground:
         self._clay = set()
         self._water = set()
         self._flowing = set()
+        self._out_of_range = set()
+        self._rows = 0
+        self._min_row = 10000
         for line in lines:
+            for point in line_to_points(line):
+                self._clay.add(point)
+                self._min_row = min(self._min_row, point[0])
+                self._rows = max(self._rows, point[0])
+        
+        self._rows += 1
+        
+    def flow(self, verbose):
+        frontier = [Drop(1, 500)]
+        last_report = 0
+        while frontier:
+            water = frontier.pop()
+            outflow = water.flow(self._clay, self._water, self._flowing, self._rows)
+            if verbose and self.reachable_tiles - last_report > 5:
+                print(self.reachable_tiles)
+                last_report = self.reachable_tiles
 
+            if outflow:
+                for flow in outflow:
+                    if flow.row < self._min_row:
+                        self._out_of_range.add(flow)
+                    frontier.append(flow)          
+        
+        if verbose:
+            print(self)
+    
+    def __repr__(self):
+        min_col = 10000
+        max_col = -10000
 
-    def update(self):
-        pass
+        for row, col in self._clay:
+            min_col = min(col, min_col)
+            max_col = max(col, max_col)
+        
+        max_col += 2
+        min_col -= 1
+
+        columns = max_col - min_col
+
+        lines = [[SAND for _ in range(columns)] for _ in range(self._rows)]
+        lines[0][500 - min_col] = SPRING
+        for row, col in self._clay:
+            lines[row][col - min_col] = CLAY
+        
+        for row, col in self._water:
+            lines[row][col - min_col] = WATER
+        
+        for row, col in self._flowing:
+            lines[row][col - min_col] = FLOWING
+        
+        return "\n".join(["".join(line) for line in lines])
+    
+    @property
+    def reachable_tiles(self):
+
+        return len(self._flowing) + len(self._water) - len(self._out_of_range)
+    
+    @property
+    def remaining_water(self):
+        return len(self._water)
+        
 
 def parse_input(lines):
     lines = deque(lines)
+    text = []
     while lines:
         line = lines.popleft().strip()
         if not line:
             break
         
-    return "\n".join(lines)
+        text.append(line)
+        
+    return text
 
 def parse_repr(lines):
     lines = deque(lines)
@@ -173,23 +263,22 @@ def parse_repr(lines):
 def day17():
     args = parse_args()
     lines = read_input(17, args.debug).split('\n')
-    ground = parse_input(lines)
+    ground = Ground(parse_input(lines))
     if args.debug:
         actual = str(ground)
         expected = parse_repr(lines)
         assert actual == expected, "{}\n{}".format(actual, expected)
     
-    iteration = 0
-    while ground.add_water():
-        iteration += 1
-        if iteration % 5 == 0 and args.verbose:
-            print(iteration, ":", ground.reachable_tiles, ground.active_region)
+    ground.flow(args.verbose)
   
-    with open("ground.txt", "w") as file:
+    with open(temp_file("ground.txt"), "w") as file:
         file.write(str(ground))
     
     print("Part 1")
     print("Reachable tiles:", ground.reachable_tiles)
+
+    print("Part 2")
+    print("Remaining water:", ground.remaining_water)
 
 if __name__ == "__main__":
     day17()
