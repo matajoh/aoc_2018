@@ -92,40 +92,45 @@ class VideoBuilder:
         self._ffmpeg.stdin.close()
         self._ffmpeg.wait()
 
+
 class Point:
+    """ Class representing a point """
+
     def __init__(self, row, col):
         self._row = row
         self._col = col
         self._hash = (row, col).__hash__()
-    
+
     def __eq__(self, other):
         return not (self.row != other.row or self.col != other.col)
-    
+
     def __hash__(self):
         return self._hash
-    
+
     def __getitem__(self, key):
         if key == 0:
             return self._row
-        
+
         if key == 1:
             return self._col
-        
+
         raise IndexError("Invalid index")
-    
+
     def __len__(self):
         return 2
-    
+
     def __repr__(self):
         return "{}(row={}, col={})".format(type(self).__name__, self._row, self._col)
-    
+
     @property
     def row(self):
+        """ The row value """
         return self._row
 
     @property
     def col(self):
+        """ The column value """
         return self._col
-    
+
     def __add__(self, other):
         return Point(self._row + other.row, self._col + other.col)
