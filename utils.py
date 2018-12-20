@@ -4,8 +4,7 @@ import os
 import argparse
 from subprocess import Popen, PIPE, STDOUT
 
-import numpy as np
-from PIL import Image
+from PIL import Image, ImagePalette
 
 PATH_TEMPLATE = "day{}_{}input.txt"
 
@@ -61,12 +60,17 @@ class VideoBuilder:
         else:
             self._width, self._height = width, height
 
-        self._color_map = color_map
-        self._frame = np.zeros((height, width, 3), np.uint8)
+        size = max(color_map.keys()) + 1
+        red = [0] * size
+        green = [0] * size
+        blue = [0] * size
+        for key in color_map:
+            red[key], green[key], blue[key] = color_map[key]
+
+        self._palette = ImagePalette.ImagePalette('RGB', red + green + blue, size*3)
         self._ffmpeg = Popen(['ffmpeg', '-y', '-f', 'image2pipe',
                               '-c:v', 'png',
                               '-s', "{}x{}".format(self._width, self._height),
-                              '-pix_fmt', 'rgba',
                               '-framerate', str(frame_rate),
                               '-i', '-',
                               '-c:v', 'libx264',
@@ -77,14 +81,9 @@ class VideoBuilder:
 
     def add_frame(self, state):
         """ Add a frame to the video using the state and the color map """
-        for row, values in enumerate(state):
-            for col, value in enumerate(values):
-                self._frame[row, col] = self._color_map[value]
-
-        with Image.fromarray(self._frame) as frame:
-            if frame.width != self._width:
-                frame = frame.resize((self._width, self._height))
-
+        with Image.fromarray(state, 'P') as frame:
+            frame.putpalette(self._palette)
+            frame = frame.resize((self._height, self._width))
             frame.save(self._ffmpeg.stdin, format='png')
 
     def close(self):

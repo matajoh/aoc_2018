@@ -176,7 +176,7 @@ class Ground:
     def flow(self, verbose, build_video):
         """ Flows water through the ground from the spring """
         if build_video:
-            state = np.zeros((self._rows, self._cols), np.int32)
+            state = np.zeros((self._rows, self._cols), np.uint8)
             state[:] = ord(SAND)
             for clay in self._clay:
                 state[clay.row, clay.col - self._min_col] = ord(CLAY)

@@ -25,7 +25,7 @@ class Area:
         self.rows = len(lines)
         self.cols = len(lines[0])
         self._acres = np.array([[ord(char) for char in line]
-                                for line in lines])
+                                for line in lines], np.uint8)
         self._acres = np.pad(self._acres, ((1, 1), (1, 1)), "constant")
         self._buffer = np.zeros_like(self._acres)
 

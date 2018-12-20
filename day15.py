@@ -215,7 +215,7 @@ class Battle:
 
         if build_video:
             self._builder = VideoBuilder("day15.mp4", self._walls, COLOR_MAP)
-            self._state = np.zeros_like(self._walls, np.int32)
+            self._state = np.zeros_like(self._walls, np.uint8)
         else:
             self._builder = None
             self._state = None
