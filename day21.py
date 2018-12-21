@@ -1,6 +1,5 @@
-""" Solution to day 19 of the 2018 Advent of Code """
+""" Solution to day 21 of the 2018 Advent of Code """
 
-import numpy as np
 import os
 
 from utils import read_input, parse_args, temp_file
@@ -232,7 +231,7 @@ class CPU:
         else:
             self._data = None
 
-    def run_program(self, program, verbose, num_checks = None):
+    def run_program(self, program, verbose, num_checks=None):
         """ Run a program on the CPU """
         self._ip = 0
 
@@ -261,15 +260,10 @@ class CPU:
             if binding is not None:
                 self._registers = assign(self._registers, binding, self._ip)
 
-            if verbose:
-                before = str(self._registers)
-
             if self._data is not None:
                 self._data.append((self._ip, tuple(self._registers)))
 
             self._registers = inst.execute(self._registers)
-            #if verbose:
-            #    print("ip={}".format(self._ip), before, inst, self._registers)
 
             if binding is not None:
                 self._ip = self._registers[binding]
@@ -277,7 +271,7 @@ class CPU:
             self._ip += 1
 
             step += 1
-        
+
         return step, checks
 
     @property
@@ -323,45 +317,39 @@ def simulate(program, verbose):
 
 def decompiled(num_checks, verbose):
     """ Decompiled (and optimized) version of the instruction set """
-    r0, r1, r2, r3, r4, r5 = 0, 0, 0, 0, 0, 0
-    r4 = 123
-    while r4 != 72:
-        r4 = r4 & 456
-    
-    r4 = 0
-    init = True
+    a = 0
+    a_values = set()
     checks = []
     while True:
-        if init:
-            r5 = r4 | 0x10000
-            r4 = 1765573
-        
-        r4 = r4 + (r5 & 0xFF)
-        r4 = r4 & 0xFFFFFF
-        r4 = r4 * 65899
-        r4 = r4 & 0xFFFFFF
-        if 256 > r5:
-            if verbose:
-                print(len(checks), r4)
-            checks.append(r4)
-            if len(checks) == num_checks:
-                if verbose:
-                    print("all checks found")
-                break
+        b = a | 0x10000
+        a = 1765573
 
-            if r4 == r0:
-                break
-            else:
-                init = True
+        while b > 0:
+            a = a + (b & 0xFF)
+            a = a & 0xFFFFFF
+            a = a * 65899
+            a = a & 0xFFFFFF
+            b = b >> 8
+
+        if verbose:
+            print(len(checks), a)
+
+        if num_checks and len(checks) == num_checks:
+            if verbose:
+                print("all checks found")
+            break
+
+        if a not in a_values:
+            a_values.add(a)
+            checks.append(a)
         else:
-            r5 = r5 >> 8
-            init = False
+            break
 
     return checks
 
 
 def day21():
-    """ Solution to day 19 """
+    """ Solution to day 21 """
     args = parse_args()
 
     lines = read_input(21).split("\n")
@@ -375,14 +363,24 @@ def day21():
                 expected = [int(line.strip()) for line in lines]
         else:
             cpu = CPU()
-            _, expected = cpu.run_program(program, args.verbose, num_checks=100)
+            _, expected = cpu.run_program(
+                program, args.verbose, num_checks=100)
             with open(checks_path, "w") as file:
                 file.write("\n".join([str(check) for check in expected]))
 
         actual = decompiled(100, args.verbose)
 
         for i, (actual, expected) in enumerate(zip(actual, expected)):
-            assert actual == expected, "{}: {} != {}".format(i, actual, expected)
+            assert actual == expected, "{}: {} != {}".format(
+                i, actual, expected)
+
+    print("Part 1")
+    checks = decompiled(1, args.verbose)
+    print(checks[0])
+
+    print("Part 2")
+    checks = decompiled(None, args.verbose)
+    print(checks[-1])
 
 
 if __name__ == "__main__":
