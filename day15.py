@@ -4,7 +4,7 @@ from collections import deque
 
 import numpy as np
 
-from utils import read_input, parse_args, VideoBuilder
+from utils import read_input, parse_args, VideoBuilder, AStarSearch, diff
 
 DEBUG_PART1_OUTCOMES = [
     27730,
@@ -39,21 +39,12 @@ COLOR_MAP = {
     GOBLIN: (255, 0, 0)
 }
 
+
 class ElfException(Exception):
     """ Exception thrown when an elf dies """
 
     def __init__(self):
         super().__init__("Elf Exception")
-
-
-def reconstruct_path(came_from, current):
-    """ Reconstructs a path for A-star search """
-    total_path = [current]
-    while current in came_from:
-        current = came_from[current]
-        total_path.append(current)
-
-    return total_path
 
 
 def heuristic(first, second):
@@ -204,6 +195,7 @@ class Battle:
         self._walls = lines == WALL
         self._units = np.zeros(lines.shape, np.dtype(Unit))
         self._raise_on_elf_death = raise_on_elf_death
+        self._search = AStarSearch(heuristic, lambda a, b: 1, self)
         for ravel, spec in enumerate(lines.flatten()):
             index = np.unravel_index(ravel, lines.shape)
             if spec not in (ELF, GOBLIN):
@@ -240,6 +232,17 @@ class Battle:
                 lines.append("{}   {}".format(field_text, unit_text).strip())
 
         return "\n".join(lines)
+    
+    def neighbors(self, position):
+        """ Returns the valid neighbors for a position """
+        for neighbor in neighbors(position):
+            if self._walls[neighbor]:
+                continue
+
+            if self._units[neighbor]:
+                continue
+            
+            yield neighbor
 
     @property
     def max_dist(self):
@@ -268,49 +271,7 @@ class Battle:
 
     def find_min_path(self, start, goal):
         """ Finds the minimum path from the start to the goal """
-        closed_set = set()
-        open_set = set([start])
-        came_from = {}
-        g_scores = {}
-        g_scores[start] = 0
-        f_scores = {}
-        f_scores[start] = heuristic(start, goal)
-        while open_set:
-            current = None
-            f_score = self._max_dist
-            for point in open_set:
-                if f_scores[point] < f_score:
-                    f_score = f_scores[point]
-                    current = point
-
-            if current == goal:
-                return reconstruct_path(came_from, current)
-
-            open_set.remove(current)
-            closed_set.add(current)
-
-            if self._walls[current]:
-                continue
-
-            if self._units[current] and current != start:
-                continue
-
-            for neighbor in neighbors(current):
-                if neighbor in closed_set:
-                    continue
-
-                tentative_g_score = g_scores[current] + 1
-                if neighbor not in open_set:
-                    open_set.add(neighbor)
-                elif tentative_g_score >= g_scores[neighbor]:
-                    continue
-
-                came_from[neighbor] = current
-                g_scores[neighbor] = tentative_g_score
-                f_scores[neighbor] = g_scores[neighbor] + \
-                    heuristic(neighbor, goal)
-
-        return None
+        return self._search.find_shortest_path(start, goal)
 
     def __repr__(self):
         return self.to_string()
@@ -362,7 +323,9 @@ class Battle:
             if unit is None or not unit.is_alive:
                 continue
 
-            self._state[unit.index] = unit.race
+            if self._state:
+                self._state[unit.index] = unit.race
+
             if unit.take_turn():
                 if i == len(units) - 1:
                     self._num_rounds += 1
@@ -462,7 +425,7 @@ def part1(debug, verbose, build_video):
         run_battle(battle, verbose)
 
         if expected:
-            assert str(battle) == expected
+            assert str(battle) == expected, diff(str(battle), expected)
 
         race, hp_sum = battle.winners
         print("Combat ends after", battle.num_rounds, "full rounds")

@@ -67,7 +67,8 @@ class VideoBuilder:
         for key in color_map:
             red[key], green[key], blue[key] = color_map[key]
 
-        self._palette = ImagePalette.ImagePalette('RGB', red + green + blue, size*3)
+        self._palette = ImagePalette.ImagePalette(
+            'RGB', red + green + blue, size*3)
         self._ffmpeg = Popen(['ffmpeg', '-y', '-f', 'image2pipe',
                               '-c:v', 'png',
                               '-s', "{}x{}".format(self._width, self._height),
@@ -135,3 +136,106 @@ class Point:
 
     def __add__(self, other):
         return Point(self._row + other.row, self._col + other.col)
+
+
+def diff(actual, expected):
+    """ Returns the diff between two multi-line strings """
+    actual_lines = actual.split('\n')
+    expected_lines = expected.split('\n')
+
+    if len(actual_lines) != len(expected_lines):
+        return "Line count differs: {} != {}".format(len(actual_lines),
+                                                     len(expected_lines))
+
+    result = ["\n" + actual]
+    for line, (actual_line, expected_line) in enumerate(zip(actual_lines,
+                                                            expected_lines)):
+        if len(actual_line) != len(expected_line):
+            print("{}: length differs: {} != {}".format(
+                line,
+                len(actual_line),
+                len(expected_line)))
+        else:
+            diffs = []
+            for actual_char, expected_char in zip(actual_line, expected_line):
+                if actual_char != expected_char:
+                    diffs.append('X')
+                else:
+                    diffs.append('.')
+
+            result.append(diffs)
+
+    return "\n".join(["".join(line) for line in result])
+
+
+class AStarSearch:
+    """ Implementation of A* Search """
+
+    def __init__(self, heuristic, distance_between, graph):
+        self._heuristic = heuristic
+        self._distance_between = distance_between
+        self._graph = graph
+
+    @staticmethod
+    def _reconstruct_path(came_from, current):
+        """ Reconstructs a path for A* search """
+        total_path = [current]
+        while current in came_from:
+            current = came_from[current]
+            total_path.append(current)
+
+        return total_path
+
+    def find_shortest_path(self, start, goal, verbose=False):
+        """ Find the shortest path from the start to the goal """
+        closed_set = set()
+        open_set = set([start])
+        came_from = {}
+        g_scores = {}
+        g_scores[start] = 0
+        f_scores = {}
+        f_scores[start] = self._heuristic(start, goal)
+        iteration = 0
+        while open_set:
+            current = None
+            f_score = None
+            for point in open_set:
+                if f_score is None:
+                    f_score = f_scores[point]
+                    current = point
+                elif f_scores[point] < f_score:
+                    f_score = f_scores[point]
+                    current = point
+
+            if verbose:
+                iteration += 1
+                if iteration % 100 == 0:
+                    print(iteration, ":",
+                          "|open_set| =",
+                          len(open_set),
+                          "current f score:",
+                          f_score)
+
+            if current == goal:
+                return AStarSearch._reconstruct_path(came_from, current)
+
+            open_set.remove(current)
+            closed_set.add(current)
+
+            for neighbor in self._graph.neighbors(current):
+                if neighbor in closed_set:
+                    continue
+
+                tentative_g_score = g_scores[current]
+                tentative_g_score += self._distance_between(current, neighbor)
+                if neighbor not in open_set:
+                    open_set.add(neighbor)
+                elif tentative_g_score >= g_scores[neighbor]:
+                    continue
+
+                came_from[neighbor] = current
+                g_scores[neighbor] = tentative_g_score
+                f_scores[neighbor] = g_scores[neighbor]
+                f_scores[neighbor] += self._heuristic(neighbor, goal)
+
+        return None
