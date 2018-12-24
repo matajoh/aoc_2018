@@ -2,9 +2,12 @@
 
 import os
 import argparse
+import itertools
+import heapq
 from subprocess import Popen, PIPE, STDOUT
 
 from PIL import Image, ImagePalette
+import numpy as np
 
 PATH_TEMPLATE = "day{}_{}input.txt"
 
@@ -239,3 +242,134 @@ class AStarSearch:
                 f_scores[neighbor] += self._heuristic(neighbor, goal)
 
         return None
+
+class MaxClique:
+    def __init__(self, edges, verbose):
+        self._edges = edges
+        self._current = []
+        self._max = []
+        self._max_size = 0
+        self._verbose = verbose
+    
+    def _find_color_groups(self, nodes):
+        color_groups = []
+        for node in nodes:
+            adjacent = True
+            for color_group in color_groups:
+                if np.sum(self._edges[node][color_group]) == 0:           
+                    color_group.append(node)
+                    adjacent = False
+                    break
+            
+            if adjacent:
+                color_groups.append([node])
+
+        return color_groups
+    
+    def _color_graph(self, nodes):
+        if self._verbose:
+            print("coloring graph of size", len(nodes))
+
+        color_groups = self._find_color_groups(nodes)        
+        nodes = []
+        colors = []
+        for color, color_group in enumerate(color_groups):
+            nodes.extend(color_group)
+            colors.extend([color + 1] * len(color_group))
+        
+        return nodes, colors
+    
+    def _color_greedy(self, color_groups, group):
+        cliques = []
+        if group == 0:
+            for node in color_groups[0]:
+                cliques.append([node])
+        else:
+            for node in color_groups[group]:
+                possible_cliques = self._color_greedy(color_groups, group - 1)
+                for clique in possible_cliques:
+                    if np.prod(self._edges[node][clique]):
+                        cliques.append(clique + [node])
+        
+        return cliques
+    
+    def find(self):
+        nodes = list(range(self._edges.shape[0]))
+
+        if self._verbose:
+            print("Coloring nodes")
+        color_groups = self._find_color_groups(nodes)
+
+        if self._verbose:
+            print("Finding maximum cliques")
+
+        cliques = self._color_greedy(color_groups, len(color_groups) - 1)
+        return cliques
+        
+        #self._max_clique(nodes)
+        #return self._max
+
+    def _max_clique(self, nodes):
+        if self._verbose:
+            print("finding max clique for graph of size", len(nodes))
+
+        nodes, colors = self._color_graph(nodes)
+
+        while nodes:
+            node = nodes.pop()
+            color = colors.pop()
+            print("|Q| + C = ", len(self._current) + color, "|Qmax| = ", self._max_size)
+            if len(self._current) + color >= self._max_size:
+                self._current.append(node)
+                adjacent = []
+                for other in nodes:
+                    if self._edges[node, other]:
+                        adjacent.append(other)
+                
+                if adjacent:
+                    self._max_clique(adjacent)
+                elif len(self._current) > self._max_size:
+                    self._max_size = len(self._current)
+                    self._max = [self._current.copy()]
+                elif len(self._current) == self._max_size:
+                    self._max.append(self._current.copy())
+                
+                assert self._current.pop() == node
+            else:
+                return
+
+
+class PriorityQueue:
+    REMOVED = '<removed-value>'
+
+    def __init__(self):
+        self._entries = []
+        self._entry_finder = {}
+        self._counter = itertools.count()
+    
+    def __len__(self):
+        return len(self._entries)
+
+    def add(self, value, priority=0):
+        'Add a new task or update the priority of an existing task'
+        if value in self._entry_finder:
+            self._remove_value(value)
+
+        count = next(self._counter)
+        entry = [priority, count, value]
+        self._entry_finder[value] = entry
+        heapq.heappush(self._entries, entry)
+
+    def _remove_value(self, value):
+        'Mark an existing task as REMOVED.  Raise KeyError if not found.'
+        entry = self._entry_finder.pop(value)
+        entry[-1] = PriorityQueue.REMOVED
+
+    def pop(self):
+        'Remove and return the lowest priority task. Raise KeyError if empty.'
+        while self._entries:
+            priority, count, value = heapq.heappop(self._entries)
+            if value is not PriorityQueue.REMOVED:
+                del self._entry_finder[value]
+                return priority, value
+        raise KeyError('pop from an empty priority queue')    

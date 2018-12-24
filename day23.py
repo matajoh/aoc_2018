@@ -2,17 +2,19 @@ from collections import namedtuple
 
 import numpy as np
 
-from utils import read_input, parse_args, diff
+from utils import read_input, parse_args, diff, PriorityQueue
+
 
 class Point(namedtuple("Point", ("x, y, z"))):
     def __add__(self, other):
         return Point(self.x + other.x, self.y + other.y, self.z + other.z)
-    
+
     @property
     def length(self):
         return self.x + self.y + self.z
 
-class Nanobot(namedtuple("Nanobot", ("x", "y", "z", "radius"))):
+
+class Nanobot(namedtuple("Nanobot", ("x", "y", "z", "radius", "cube"))):
     @staticmethod
     def parse(spec):
         # pos=<0,0,0>, r=4
@@ -21,81 +23,156 @@ class Nanobot(namedtuple("Nanobot", ("x", "y", "z", "radius"))):
         pos = [int(part.strip()) for part in spec[5:pos_end].split(',')]
         rad_start = spec.index('=', pos_end)
         rad = int(spec[rad_start+1:].strip())
-        nanobot = Nanobot(pos[0], pos[1], pos[2], rad)
-        assert str(nanobot) == spec, diff(str(nanobot), spec)
-        return nanobot               
-    
-    @property
-    def min_point(self):
-        diff = self.radius // 3
-        return Point(self.x - diff, self.y - diff, self - self.radius + 2*diff)
-    
+        cube = Cube(pos[0] - rad,
+                    pos[0] + rad + 1,
+                    pos[1] - rad,
+                    pos[1] + rad + 1,
+                    pos[2] - rad,
+                    pos[2] + rad + 1)
+
+        nanobot = Nanobot(pos[0], pos[1], pos[2], rad, cube)
+
+        assert str(nanobot)[8:-1] == spec, diff(str(nanobot), spec)
+        return nanobot
+
     def __repr__(self):
-        return "pos=<{},{},{}>, r={}".format(self.x, self.y,
-                                            self.z, self.radius)
-    
+        return "Nanobot(pos=<{},{},{}>, r={})".format(self.x, self.y,
+                                                      self.z, self.radius)
+
     def __sub__(self, other):
         return abs(self.x - other.x) + abs(self.y - other.y) + abs(self.z - other.z)
-    
+
     def in_range(self, other):
         return (self - other) <= self.radius
-    
-    def intersects(self, other):
-        return (other - self) <= (self.radius + other.radius)
-    
+
+    def intersects_bot(self, bot):
+        return (bot - self) <= (self.radius + bot.radius)
+
+    def intersects_cube(self, cube):
+        if self.cube.intersects(cube):
+            if cube.contains(self):
+                return True
+
+            for face in cube.faces():
+                if self.intersects_plane(face):
+                    return True
+
+            return False
+
+        return False
+
+    def intersects_plane(self, plane):
+        print(self, plane)
+        # logic is much simpler due to aligned cube
+        # find point of intersection
+        # verify it is inside the plane
+        distance = plane.a*self.x + plane.b*self.y + plane.c*self.z + plane.d
+        print(distance*distance, plane.squared_mag, self.radius)
+        return distance*distance <= plane.squared_mag*self.radius*self.radius
+
+
+class Plane(namedtuple("Plane", ("a", "b", "c", "d"))):
+    @staticmethod
+    def from_points(A, B, C):
+        A = np.array(A, np.int32)
+        B = np.array(B, np.int32)
+        C = np.array(C, np.int32)
+        AB = B - A
+        AC = C - A
+        N = np.cross(AB, AC)
+        a = N[0]
+        b = N[1]
+        c = N[2]
+        d = -np.sum(N*C)
+        plane = Plane(a, b, c, d)
+        assert plane.contains(A)
+        assert plane.contains(B)
+        assert plane.contains(C)
+        return plane
+
     @property
-    def cube(self):
-        return Cube(self.x - self.radius,
-                    self.x + self.radius + 1,
-                    self.y - self.radius,
-                    self.y + self.radius + 1,
-                    self.z - self.radius,
-                    self.z + self.radius + 1)
+    def squared_mag(self):
+        return self.a*self.a + self.b*self.b + self.c*self.c
+
+    def contains(self, point):
+        return self.a*point[0] + self.b*point[1] + self.c*point[2] + self.d == 0
+
 
 class Cube(namedtuple("Cube", ("left", "right", "up", "down", "front", "back"))):
-    def intersect_with(self, other):
-        return Cube(
-            max(self.left, other.left),
-            min(self.right, other.right),
-            max(self.up, other.up),
-            min(self.down, other.down),
-            max(self.front, other.front),
-            min(self.back, other.back))
-    
-    def contains(self, other):
-        return other.left <= self.right and\
-               other.right >= self.left and\
-               other.up <= self.down and\
-               other.down >= self.up and\
-               other.front <= self.back and\
-               other.back >= self.front
-    
-    def points(self):
-        num_points = (self.right - self.left) * (self.down - self.up) * (self.back - self.front)
-        print("enumerating", num_points, "points")
-        for x in range(self.left, self.right):
-            for y in range(self.up, self.down):
-                for z in range(self.front, self.back):
-                    yield namedtuple("Point", ("x", "y", "z"))(x, y, z)
-    
+    def intersects(self, cube):
+        return cube.left <= self.right and cube.right >= self.left and\
+            cube.up <= self.down and cube.down >= self.up and \
+            cube.front <= self.back and cube.back >= self.front
+
+    def faces(self):
+        x_values = [self.left, self.left, self.left,
+                    self.right, self.right, self.right,
+                    self.left, self.left, self.right,
+                    self.left, self.left, self.right,
+                    self.left, self.left, self.right,
+                    self.left, self.left, self.right
+                    ]
+        y_values = [self.up, self.down, self.down,
+                    self.up, self.down, self.down,
+                    self.up, self.up, self.up,
+                    self.down, self.down, self.down,
+                    self.up, self.down, self.down,
+                    self.up, self.down, self.down]
+        z_values = [self.front, self.front, self.back,
+                    self.front, self.front, self.back,
+                    self.front, self.back, self.back,
+                    self.front, self.back, self.back,
+                    self.front, self.front, self.front,
+                    self.back, self.back, self.back]
+        corners = zip(x_values, y_values, z_values)
+        corners = [Point(x, y, z) for x, y, z in corners]
+        for i in range(6):
+            yield Plane.from_points(corners[i*3], corners[i*3+1], corners[i*3+2])
+
+    def parts(self):
+        x = self.left + (self.width // 2)
+        y = self.up + (self.height // 2)
+        z = self.front + (self.depth // 2)
+
+        lefts = [self.left, self.left, self.left, self.left, x, x, x, x]
+        rights = [x, x, x, x, self.right, self.right, self.right, self.right]
+        ups = [self.up, self.up, y, y, self.up, self.up, y, y]
+        downs = [y, y, self.down, self.down, y, y, self.down, self.down]
+        fronts = [self.front, z, self.front, z, self.front, z, self.front, z]
+        backs = [z, self.back, z, self.back, z, self.back, z, self.back]
+
+        for left, right, up, down, front, back in zip(lefts, rights, ups, downs, fronts, backs):
+            yield Cube(left, right, up, down, front, back)
+
+    def contains(self, point):
+        return point.x >= self.left and point.x < self.right and \
+            point.y >= self.up and point.y < self.down and \
+            point.z >= self.front and point.z < self.back
+
+    @property
+    def size(self):
+        return self.width * self.height * self.depth
+
     @property
     def width(self):
         return self.right - self.left
-    
+
     @property
     def height(self):
         return self.down - self.up
-    
+
     @property
     def depth(self):
         return self.back - self.front
+
 
 def read_nanobots(lines):
     nanobots = []
     for line in lines:
         nanobots.append(Nanobot.parse(line))
-    
+
     return nanobots
+
 
 def find_strongest(nanobots):
     nanobots.sort(key=lambda nanobot: nanobot.radius, reverse=True)
@@ -106,6 +183,7 @@ def find_strongest(nanobots):
             strongest.append(nanobot)
 
     return strongest
+
 
 def count_in_range(strongest, nanobots, verbose):
     num_in_range = 0
@@ -122,151 +200,63 @@ def count_in_range(strongest, nanobots, verbose):
             )
         if in_range:
             num_in_range += 1
-    
+
     return num_in_range
 
-class MaxClique:
-    def __init__(self, edges, verbose):
-        self._edges = edges
-        self._current = []
-        self._max = []
-        self._max_size = 0
-        self._verbose = verbose
-    
-    def _find_color_groups(self, nodes):
-        color_groups = []
-        for node in nodes:
-            adjacent = True
-            for color_group in color_groups:
-                if np.sum(self._edges[node][color_group]) == 0:           
-                    color_group.append(node)
-                    adjacent = False
-                    break
-            
-            if adjacent:
-                color_groups.append([node])
 
-        return color_groups
-    
-    def _color_graph(self, nodes):
-        if self._verbose:
-            print("coloring graph of size", len(nodes))
+def num_bots_for_cube(cube, nanobots):
+    num_bots = 0
+    for nanobot in nanobots:
+        if nanobot.intersects_cube(cube):
+            num_bots += 1
 
-        color_groups = self._find_color_groups(nodes)        
-        nodes = []
-        colors = []
-        for color, color_group in enumerate(color_groups):
-            nodes.extend(color_group)
-            colors.extend([color + 1] * len(color_group))
-        
-        return nodes, colors
+    return num_bots
+
+def num_bots_for_point(point, nanobots):
+    num_bots = 0
+    for nanobot in nanobots:
+        if nanobot.in_range(point):
+            num_bots += 1
     
-    def _color_greedy(self, color_groups, group):
-        cliques = []
-        if group == 0:
-            for node in color_groups[0]:
-                cliques.append([node])
+    return num_bots
+
+
+def find_max_point(nanobots, verbose):
+    left = nanobots[0].x
+    up = nanobots[0].y
+    front = nanobots[0].z
+    right, down, back = left, up, front
+
+    for nanobot in nanobots[1:]:
+        left = min(nanobot.x, left)
+        up = min(nanobot.y, up)
+        front = min(nanobot.z, front)
+        right = max(nanobot.x, right)
+        down = max(nanobot.y, down)
+        back = max(nanobot.z, back)
+
+    cube = Cube(left, right, up, down, front, back)
+    num_bots = num_bots_for_cube(cube, nanobots)
+    assert num_bots == len(nanobots)
+
+    queue = PriorityQueue()
+    queue.add(cube, -num_bots)
+
+    while queue:
+        priority, cube = queue.pop()
+        print("looking at", cube)
+        if cube.size == 0:
+            continue
+
+        if cube.size == 1:
+            point = Point(cube.left, cube.up, cube.front)
+            assert priority == num_bots_for_point(point, nanobots)
+            return point
         else:
-            for node in color_groups[group]:
-                possible_cliques = self._color_greedy(color_groups, group - 1)
-                for clique in possible_cliques:
-                    if np.prod(self._edges[node][clique]):
-                        cliques.append(clique + [node])
-        
-        return cliques
-    
-    def find(self):
-        nodes = list(range(self._edges.shape[0]))
+            for part in cube.parts():
+                num_bots = num_bots_for_cube(part, nanobots)
+                queue.add(part, -num_bots)
 
-        if self._verbose:
-            print("Coloring nodes")
-        color_groups = self._find_color_groups(nodes)
-
-        if self._verbose:
-            print("Finding maximum cliques")
-
-        cliques = self._color_greedy(color_groups, len(color_groups) - 1)
-        return cliques
-        
-        #self._max_clique(nodes)
-        #return self._max
-
-    def _max_clique(self, nodes):
-        if self._verbose:
-            print("finding max clique for graph of size", len(nodes))
-
-        nodes, colors = self._color_graph(nodes)
-
-        while nodes:
-            node = nodes.pop()
-            color = colors.pop()
-            print("|Q| + C = ", len(self._current) + color, "|Qmax| = ", self._max_size)
-            if len(self._current) + color >= self._max_size:
-                self._current.append(node)
-                adjacent = []
-                for other in nodes:
-                    if self._edges[node, other]:
-                        adjacent.append(other)
-                
-                if adjacent:
-                    self._max_clique(adjacent)
-                elif len(self._current) > self._max_size:
-                    self._max_size = len(self._current)
-                    self._max = [self._current.copy()]
-                elif len(self._current) == self._max_size:
-                    self._max.append(self._current.copy())
-                
-                assert self._current.pop() == node
-            else:
-                return
-
-def find_intersecting_groups(nanobots, verbose):
-    num_bots = len(nanobots)
-    edges = np.zeros((num_bots, num_bots), np.bool)
-    for i in range(num_bots):
-        edges[i, i] = True
-        nanobot = nanobots[i]
-        if verbose:
-            print("checking", nanobot)
-
-        for j in range(i + 1, num_bots):
-            if nanobot.intersects(nanobots[j]):
-                edges[i, j] = True
-                edges[j, i] = True
-    
-    lookup = np.zeros(num_bots, np.dtype(Nanobot))
-    lookup[:] = nanobots
-    max_clique = MaxClique(edges, verbose)
-    groups = max_clique.find()
-    for group in groups:
-        yield lookup[group]
-
-def find_nearest_group_point(group, verbose):
-    # compress group
-    num_bots = len(group)
-    contains = np.zeros((num_bots, num_bots), np.bool)
-    for i in range(num_bots):
-        for j in range(i+1, num_bots):
-            if i == j:
-                contains[i, j] = True
-            else:
-                contains[i, j] = group[i].contains(group[j])
-
-    to_remove = []
-    for i in range(num_bots):
-        if np.prod(contains)
-    pass
-
-def find_nearest_point(groups, verbose):
-    min_point = None
-    for group in groups:
-        point = find_nearest_group_point(group, verbose)
-        if min_point is None:
-            min_point = point
-        elif point.length < min_point.length:
-            min_point = point
-    
-    return min_point
 
 def exhaustive_point_search(nanobots):
     min_vals = [100, 100, 100]
@@ -292,16 +282,44 @@ def exhaustive_point_search(nanobots):
                     if nanobot.in_range(point):
                         in_range.append(nanobot)
                         num_bots += 1
-                
+
                 if num_bots > max_bots:
                     max_bots = num_bots
                     max_points = [point]
                 elif num_bots == max_bots:
                     max_points.append(point)
-    
+
     return sorted(max_points, key=lambda point: point.x + point.y + point.z)[0]
 
+
 def debug(nanobots, verbose):
+    cube = Cube(2, 6, -2, 4, -3, -1)
+    faces = list(cube.faces())
+    print(faces)
+
+    bots = [
+        (Nanobot.parse("pos=<4,1,-2>, r=4"), True), # inside
+        (Nanobot.parse("pos=<0,1,-2>, r=4"), True), # left
+        (Nanobot.parse("pos=<8,1,-2>, r=4"), True), # right
+        (Nanobot.parse("pos=<4,-4,-2>, r=4"), True), # up
+        (Nanobot.parse("pos=<4,6,-2>, r=4"), True), # down
+        (Nanobot.parse("pos=<4,-5,-2>, r=4"), True), # front
+        (Nanobot.parse("pos=<4,1,-2>, r=4"), True), # back
+        (Nanobot.parse("pos=<0,-4,-4>, r=2"), False),
+        (Nanobot.parse("pos=<0,-3,0>, r=2"), False),
+        (Nanobot.parse("pos=<0,1,-4>, r=2"), False),
+        (Nanobot.parse("pos=<0,1,0>, r=2"), False),
+        (Nanobot.parse("pos=<8,-3,-4>, r=2"), False),
+        (Nanobot.parse("pos=<8,-3,0>, r=2"), False),
+        (Nanobot.parse("pos=<8,1,-4>, r=2"), False),
+        (Nanobot.parse("pos=<8,1,0>, r=2"), False)
+    ]
+
+    for bot, expected in bots:
+        actual = bot.intersects_cube(cube)
+        assert actual == expected, "{} {}".format(bot, cube)
+
+
     strongest = find_strongest(nanobots)
     assert len(strongest) == 1
     strongest = strongest[0]
@@ -309,44 +327,33 @@ def debug(nanobots, verbose):
 
     expected = 7
     actual = count_in_range(strongest, nanobots, verbose)
-    
-    assert actual == expected, "{} != {}".format(actual, expected)
 
-    expected = 9
-    groups = list(find_intersecting_groups(nanobots, verbose))
-
-    group = groups[0]
-    for lhs in group:
-        for rhs in group:
-            assert lhs.intersects(rhs), "{} does not intersect {}".format(lhs, rhs)
-    
-    print(group)
-    expected = 3
-    actual = len(group)
     assert actual == expected, "{} != {}".format(actual, expected)
 
     expected = exhaustive_point_search(nanobots)
-    actual = find_nearest_point(groups, verbose)
+    actual = find_max_point(nanobots, verbose)
     assert actual == expected, "{} != {}".format(actual, expected)
+
+    assert actual.length == actual.x + actual.y + actual.z
 
 
 def part1(nanobots, verbose):
     strongest_bots = find_strongest(nanobots)
     if verbose:
         print("found strongest:", strongest_bots)
-    
+
     max_in_range = 0
     for strongest in strongest_bots:
         num_in_range = count_in_range(strongest, nanobots, verbose)
         if num_in_range > max_in_range:
             max_in_range = num_in_range
-    
+
     return max_in_range
 
+
 def part2(nanobots, verbose):
-    groups = find_intersecting_groups(nanobots, verbose)
-    point = find_nearest_point(groups, verbose)
-    return point.x + point.y + point.z
+    point = find_max_point(nanobots, verbose)
+    return point.length
 
 
 def day23():
@@ -363,6 +370,7 @@ def day23():
 
         print("Part 2")
         print(part2(nanobots, args.verbose))
+
 
 if __name__ == "__main__":
     day23()
