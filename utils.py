@@ -4,6 +4,7 @@ import os
 import argparse
 import itertools
 import heapq
+from collections import deque
 from subprocess import Popen, PIPE, STDOUT
 
 from PIL import Image, ImagePalette
@@ -243,6 +244,7 @@ class AStarSearch:
 
         return None
 
+
 class MaxClique:
     def __init__(self, edges, verbose):
         self._edges = edges
@@ -250,35 +252,35 @@ class MaxClique:
         self._max = []
         self._max_size = 0
         self._verbose = verbose
-    
+
     def _find_color_groups(self, nodes):
         color_groups = []
         for node in nodes:
             adjacent = True
             for color_group in color_groups:
-                if np.sum(self._edges[node][color_group]) == 0:           
+                if np.sum(self._edges[node][color_group]) == 0:
                     color_group.append(node)
                     adjacent = False
                     break
-            
+
             if adjacent:
                 color_groups.append([node])
 
         return color_groups
-    
+
     def _color_graph(self, nodes):
         if self._verbose:
             print("coloring graph of size", len(nodes))
 
-        color_groups = self._find_color_groups(nodes)        
+        color_groups = self._find_color_groups(nodes)
         nodes = []
         colors = []
         for color, color_group in enumerate(color_groups):
             nodes.extend(color_group)
             colors.extend([color + 1] * len(color_group))
-        
+
         return nodes, colors
-    
+
     def _color_greedy(self, color_groups, group):
         cliques = []
         if group == 0:
@@ -290,9 +292,9 @@ class MaxClique:
                 for clique in possible_cliques:
                     if np.prod(self._edges[node][clique]):
                         cliques.append(clique + [node])
-        
+
         return cliques
-    
+
     def find(self):
         nodes = list(range(self._edges.shape[0]))
 
@@ -305,9 +307,9 @@ class MaxClique:
 
         cliques = self._color_greedy(color_groups, len(color_groups) - 1)
         return cliques
-        
-        #self._max_clique(nodes)
-        #return self._max
+
+        # self._max_clique(nodes)
+        # return self._max
 
     def _max_clique(self, nodes):
         if self._verbose:
@@ -318,14 +320,15 @@ class MaxClique:
         while nodes:
             node = nodes.pop()
             color = colors.pop()
-            print("|Q| + C = ", len(self._current) + color, "|Qmax| = ", self._max_size)
+            print("|Q| + C = ", len(self._current) +
+                  color, "|Qmax| = ", self._max_size)
             if len(self._current) + color >= self._max_size:
                 self._current.append(node)
                 adjacent = []
                 for other in nodes:
                     if self._edges[node, other]:
                         adjacent.append(other)
-                
+
                 if adjacent:
                     self._max_clique(adjacent)
                 elif len(self._current) > self._max_size:
@@ -333,7 +336,7 @@ class MaxClique:
                     self._max = [self._current.copy()]
                 elif len(self._current) == self._max_size:
                     self._max.append(self._current.copy())
-                
+
                 assert self._current.pop() == node
             else:
                 return
@@ -346,7 +349,7 @@ class PriorityQueue:
         self._entries = []
         self._entry_finder = {}
         self._counter = itertools.count()
-    
+
     def __len__(self):
         return len(self._entries)
 
@@ -368,8 +371,68 @@ class PriorityQueue:
     def pop(self):
         'Remove and return the lowest priority task. Raise KeyError if empty.'
         while self._entries:
-            priority, count, value = heapq.heappop(self._entries)
+            priority, _, value = heapq.heappop(self._entries)
             if value is not PriorityQueue.REMOVED:
                 del self._entry_finder[value]
                 return priority, value
-        raise KeyError('pop from an empty priority queue')    
+        raise KeyError('pop from an empty priority queue')
+
+
+class Tokenizer:
+    def __init__(self, text):
+        self.tokens = deque(text)
+
+    def peek(self):
+        if self.tokens:
+            return self.tokens[0]
+
+        return None
+
+    def read(self, num_tokens=1):
+        result = []
+        for _ in range(num_tokens):
+            if self.tokens:
+                result.append(self.tokens.popleft())
+
+        return "".join(result)
+
+    def consume(self, expected):
+        actual = self.read(len(expected))
+        assert actual == expected, diff(actual, expected)
+
+    def skip_whitespace(self):
+        while self.peek() and self.peek().isspace():
+            self.read()
+
+    def read_word(self):
+        result = []
+        self.skip_whitespace()
+        while self.peek():
+            if not self.peek().isalpha():
+                break
+
+            result.append(self.read())
+
+        return "".join(result)
+
+    def read_until(self, *args):
+        result = []
+        stop = set(args)
+        while self.peek() and self.peek() not in stop:
+            result.append(self.read())
+
+        return "".join(result)
+
+    def read_int(self):
+        result = []
+        self.skip_whitespace()
+        while self.peek():
+            if self.peek().isspace():
+                break
+
+            if self.peek().isdigit():
+                result.append(self.read())
+            else:
+                break
+
+        return int("".join(result))
