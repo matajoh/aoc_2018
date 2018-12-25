@@ -362,6 +362,13 @@ class PriorityQueue:
         entry = [priority, count, value]
         self._entry_finder[value] = entry
         heapq.heappush(self._entries, entry)
+    
+    def peek(self):
+        if self:
+            priority, _, value = self._entries[0]
+            return priority, value
+        
+        return 0, None
 
     def _remove_value(self, value):
         'Mark an existing task as REMOVED.  Raise KeyError if not found.'

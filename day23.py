@@ -13,8 +13,17 @@ class Point(namedtuple("Point", ("x, y, z"))):
     def length(self):
         return self.x + self.y + self.z
 
+def range_dist(value, range):
+    if value < range[0]:
+        return range[0] - value
+    
+    if value > range[1]:
+        return value - range[1]
+    
+    return 0
 
-class Nanobot(namedtuple("Nanobot", ("x", "y", "z", "radius", "cube"))):
+
+class Nanobot(namedtuple("Nanobot", ("x", "y", "z", "radius"))):
     @staticmethod
     def parse(spec):
         # pos=<0,0,0>, r=4
@@ -23,17 +32,18 @@ class Nanobot(namedtuple("Nanobot", ("x", "y", "z", "radius", "cube"))):
         pos = [int(part.strip()) for part in spec[5:pos_end].split(',')]
         rad_start = spec.index('=', pos_end)
         rad = int(spec[rad_start+1:].strip())
-        cube = Cube(pos[0] - rad,
-                    pos[0] + rad + 1,
-                    pos[1] - rad,
-                    pos[1] + rad + 1,
-                    pos[2] - rad,
-                    pos[2] + rad + 1)
-
-        nanobot = Nanobot(pos[0], pos[1], pos[2], rad, cube)
+        nanobot = Nanobot(pos[0], pos[1], pos[2], rad)
 
         assert str(nanobot)[8:-1] == spec, diff(str(nanobot), spec)
         return nanobot
+    
+    @property
+    def min(self):
+        return min(self.x - self.radius, self.y - self.radius, self.z - self.radius)
+    
+    @property
+    def max(self):
+        return max(self.x + self.radius, self.y + self.radius, self.z + self.radius)
 
     def __repr__(self):
         return "Nanobot(pos=<{},{},{}>, r={})".format(self.x, self.y,
@@ -49,121 +59,26 @@ class Nanobot(namedtuple("Nanobot", ("x", "y", "z", "radius", "cube"))):
         return (bot - self) <= (self.radius + bot.radius)
 
     def intersects_cube(self, cube):
-        if self.cube.intersects(cube):
-            if cube.contains(self):
-                return True
-
-            for face in cube.faces():
-                if self.intersects_plane(face):
-                    return True
-
-            return False
-
-        return False
-
-    def intersects_plane(self, plane):
-        print(self, plane)
-        # logic is much simpler due to aligned cube
-        # find point of intersection
-        # verify it is inside the plane
-        distance = plane.a*self.x + plane.b*self.y + plane.c*self.z + plane.d
-        print(distance*distance, plane.squared_mag, self.radius)
-        return distance*distance <= plane.squared_mag*self.radius*self.radius
+        x_range = (cube.x, cube.x + cube.length - 1)
+        y_range = (cube.y, cube.y + cube.length - 1)
+        z_range = (cube.z, cube.z + cube.length - 1)
+        distance = range_dist(self.x, x_range)
+        distance += range_dist(self.y, y_range)
+        distance += range_dist(self.z, z_range)
+        return distance <= self.radius
 
 
-class Plane(namedtuple("Plane", ("a", "b", "c", "d"))):
-    @staticmethod
-    def from_points(A, B, C):
-        A = np.array(A, np.int32)
-        B = np.array(B, np.int32)
-        C = np.array(C, np.int32)
-        AB = B - A
-        AC = C - A
-        N = np.cross(AB, AC)
-        a = N[0]
-        b = N[1]
-        c = N[2]
-        d = -np.sum(N*C)
-        plane = Plane(a, b, c, d)
-        assert plane.contains(A)
-        assert plane.contains(B)
-        assert plane.contains(C)
-        return plane
-
+class Cube(namedtuple("Cube", ("x", "y", "z", "length"))):
     @property
-    def squared_mag(self):
-        return self.a*self.a + self.b*self.b + self.c*self.c
-
-    def contains(self, point):
-        return self.a*point[0] + self.b*point[1] + self.c*point[2] + self.d == 0
-
-
-class Cube(namedtuple("Cube", ("left", "right", "up", "down", "front", "back"))):
-    def intersects(self, cube):
-        return cube.left <= self.right and cube.right >= self.left and\
-            cube.up <= self.down and cube.down >= self.up and \
-            cube.front <= self.back and cube.back >= self.front
-
-    def faces(self):
-        x_values = [self.left, self.left, self.left,
-                    self.right, self.right, self.right,
-                    self.left, self.left, self.right,
-                    self.left, self.left, self.right,
-                    self.left, self.left, self.right,
-                    self.left, self.left, self.right
-                    ]
-        y_values = [self.up, self.down, self.down,
-                    self.up, self.down, self.down,
-                    self.up, self.up, self.up,
-                    self.down, self.down, self.down,
-                    self.up, self.down, self.down,
-                    self.up, self.down, self.down]
-        z_values = [self.front, self.front, self.back,
-                    self.front, self.front, self.back,
-                    self.front, self.back, self.back,
-                    self.front, self.back, self.back,
-                    self.front, self.front, self.front,
-                    self.back, self.back, self.back]
-        corners = zip(x_values, y_values, z_values)
-        corners = [Point(x, y, z) for x, y, z in corners]
-        for i in range(6):
-            yield Plane.from_points(corners[i*3], corners[i*3+1], corners[i*3+2])
+    def distance(self):
+        return abs(self.x) + abs(self.y) + abs(self.z)
 
     def parts(self):
-        x = self.left + (self.width // 2)
-        y = self.up + (self.height // 2)
-        z = self.front + (self.depth // 2)
-
-        lefts = [self.left, self.left, self.left, self.left, x, x, x, x]
-        rights = [x, x, x, x, self.right, self.right, self.right, self.right]
-        ups = [self.up, self.up, y, y, self.up, self.up, y, y]
-        downs = [y, y, self.down, self.down, y, y, self.down, self.down]
-        fronts = [self.front, z, self.front, z, self.front, z, self.front, z]
-        backs = [z, self.back, z, self.back, z, self.back, z, self.back]
-
-        for left, right, up, down, front, back in zip(lefts, rights, ups, downs, fronts, backs):
-            yield Cube(left, right, up, down, front, back)
-
-    def contains(self, point):
-        return point.x >= self.left and point.x < self.right and \
-            point.y >= self.up and point.y < self.down and \
-            point.z >= self.front and point.z < self.back
-
-    @property
-    def size(self):
-        return self.width * self.height * self.depth
-
-    @property
-    def width(self):
-        return self.right - self.left
-
-    @property
-    def height(self):
-        return self.down - self.up
-
-    @property
-    def depth(self):
-        return self.back - self.front
+        length = self.length // 2
+        for x in range(2):
+            for y in range(2):
+                for z in range(2):
+                    yield Cube(self.x + x*length, self.y+y*length, self.z + z*length, length)
 
 
 def read_nanobots(lines):
@@ -222,40 +137,38 @@ def num_bots_for_point(point, nanobots):
 
 
 def find_max_point(nanobots, verbose):
-    left = nanobots[0].x
-    up = nanobots[0].y
-    front = nanobots[0].z
-    right, down, back = left, up, front
+    min_dim = nanobots[0].min
+    max_dim = min_dim
 
     for nanobot in nanobots[1:]:
-        left = min(nanobot.x, left)
-        up = min(nanobot.y, up)
-        front = min(nanobot.z, front)
-        right = max(nanobot.x, right)
-        down = max(nanobot.y, down)
-        back = max(nanobot.z, back)
+        min_dim = min(nanobot.min, min_dim)
+        max_dim = max(nanobot.max, max_dim)
 
-    cube = Cube(left, right, up, down, front, back)
+    size = max_dim - min_dim
+    target_size = 1
+    while target_size < size:
+        target_size *= 2
+    
+    cube = Cube(min_dim, min_dim, min_dim, target_size)
     num_bots = num_bots_for_cube(cube, nanobots)
     assert num_bots == len(nanobots)
 
     queue = PriorityQueue()
-    queue.add(cube, -num_bots)
+    queue.add(cube, (-num_bots, cube.distance))
 
     while queue:
         priority, cube = queue.pop()
-        print("looking at", cube)
-        if cube.size == 0:
-            continue
+        print(cube, "length:", cube.length, "possible:", -priority[0])
+        assert cube.length
 
-        if cube.size == 1:
-            point = Point(cube.left, cube.up, cube.front)
-            assert priority == num_bots_for_point(point, nanobots)
-            return point
+        if cube.length == 1:
+            num_bots = num_bots_for_point(cube, nanobots)
+            assert -priority[0] == num_bots, "{} != {}".format(-priority, num_bots)
+            return Point(cube.x, cube.y, cube.z)
         else:
             for part in cube.parts():
-                num_bots = num_bots_for_cube(part, nanobots)
-                queue.add(part, -num_bots)
+                priority = (-num_bots_for_cube(part, nanobots), part.distance)
+                queue.add(part, priority)
 
 
 def exhaustive_point_search(nanobots):
@@ -293,33 +206,6 @@ def exhaustive_point_search(nanobots):
 
 
 def debug(nanobots, verbose):
-    cube = Cube(2, 6, -2, 4, -3, -1)
-    faces = list(cube.faces())
-    print(faces)
-
-    bots = [
-        (Nanobot.parse("pos=<4,1,-2>, r=4"), True), # inside
-        (Nanobot.parse("pos=<0,1,-2>, r=4"), True), # left
-        (Nanobot.parse("pos=<8,1,-2>, r=4"), True), # right
-        (Nanobot.parse("pos=<4,-4,-2>, r=4"), True), # up
-        (Nanobot.parse("pos=<4,6,-2>, r=4"), True), # down
-        (Nanobot.parse("pos=<4,-5,-2>, r=4"), True), # front
-        (Nanobot.parse("pos=<4,1,-2>, r=4"), True), # back
-        (Nanobot.parse("pos=<0,-4,-4>, r=2"), False),
-        (Nanobot.parse("pos=<0,-3,0>, r=2"), False),
-        (Nanobot.parse("pos=<0,1,-4>, r=2"), False),
-        (Nanobot.parse("pos=<0,1,0>, r=2"), False),
-        (Nanobot.parse("pos=<8,-3,-4>, r=2"), False),
-        (Nanobot.parse("pos=<8,-3,0>, r=2"), False),
-        (Nanobot.parse("pos=<8,1,-4>, r=2"), False),
-        (Nanobot.parse("pos=<8,1,0>, r=2"), False)
-    ]
-
-    for bot, expected in bots:
-        actual = bot.intersects_cube(cube)
-        assert actual == expected, "{} {}".format(bot, cube)
-
-
     strongest = find_strongest(nanobots)
     assert len(strongest) == 1
     strongest = strongest[0]
