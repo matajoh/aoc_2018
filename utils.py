@@ -246,6 +246,7 @@ class AStarSearch:
 
 
 class MaxClique:
+    """ Find the maximum clique in a graph """
     def __init__(self, edges, verbose):
         self._edges = edges
         self._current = []
@@ -281,35 +282,11 @@ class MaxClique:
 
         return nodes, colors
 
-    def _color_greedy(self, color_groups, group):
-        cliques = []
-        if group == 0:
-            for node in color_groups[0]:
-                cliques.append([node])
-        else:
-            for node in color_groups[group]:
-                possible_cliques = self._color_greedy(color_groups, group - 1)
-                for clique in possible_cliques:
-                    if np.prod(self._edges[node][clique]):
-                        cliques.append(clique + [node])
-
-        return cliques
-
     def find(self):
+        """ Finds the maximum clique """
         nodes = list(range(self._edges.shape[0]))
-
-        if self._verbose:
-            print("Coloring nodes")
-        color_groups = self._find_color_groups(nodes)
-
-        if self._verbose:
-            print("Finding maximum cliques")
-
-        cliques = self._color_greedy(color_groups, len(color_groups) - 1)
-        return cliques
-
-        # self._max_clique(nodes)
-        # return self._max
+        self._max_clique(nodes)
+        return self._max
 
     def _max_clique(self, nodes):
         if self._verbose:
@@ -320,8 +297,10 @@ class MaxClique:
         while nodes:
             node = nodes.pop()
             color = colors.pop()
-            print("|Q| + C = ", len(self._current) +
-                  color, "|Qmax| = ", self._max_size)
+            if self._verbose:
+                print("|Q| + C = ", len(self._current) +
+                      color, "|Qmax| = ", self._max_size)
+
             if len(self._current) + color >= self._max_size:
                 self._current.append(node)
                 adjacent = []
@@ -343,6 +322,7 @@ class MaxClique:
 
 
 class PriorityQueue:
+    """ Implementation of a priority queue """
     REMOVED = '<removed-value>'
 
     def __init__(self):
@@ -354,7 +334,7 @@ class PriorityQueue:
         return len(self._entries)
 
     def add(self, value, priority=0):
-        'Add a new task or update the priority of an existing task'
+        """ Add a new value or update the priority of an existing value """
         if value in self._entry_finder:
             self._remove_value(value)
 
@@ -362,21 +342,14 @@ class PriorityQueue:
         entry = [priority, count, value]
         self._entry_finder[value] = entry
         heapq.heappush(self._entries, entry)
-    
-    def peek(self):
-        if self:
-            priority, _, value = self._entries[0]
-            return priority, value
-        
-        return 0, None
 
     def _remove_value(self, value):
-        'Mark an existing task as REMOVED.  Raise KeyError if not found.'
+        """Mark an existing task as REMOVED.  Raise KeyError if not found."""
         entry = self._entry_finder.pop(value)
         entry[-1] = PriorityQueue.REMOVED
 
     def pop(self):
-        'Remove and return the lowest priority task. Raise KeyError if empty.'
+        """Remove and return the lowest priority task. Raise KeyError if empty."""
         while self._entries:
             priority, _, value = heapq.heappop(self._entries)
             if value is not PriorityQueue.REMOVED:
@@ -386,16 +359,19 @@ class PriorityQueue:
 
 
 class Tokenizer:
+    """ Tokenizes a string and provides useful parsing abilities """
     def __init__(self, text):
         self.tokens = deque(text)
 
     def peek(self):
+        """ Returns the current token without consuming it """
         if self.tokens:
             return self.tokens[0]
 
         return None
 
     def read(self, num_tokens=1):
+        """ Read and consumes at most `num_tokens` from the string """
         result = []
         for _ in range(num_tokens):
             if self.tokens:
@@ -404,14 +380,17 @@ class Tokenizer:
         return "".join(result)
 
     def consume(self, expected):
+        """ Consumes and asserts the tokens in the string """
         actual = self.read(len(expected))
         assert actual == expected, diff(actual, expected)
 
     def skip_whitespace(self):
+        """ Consumes whitespace tokens until non-whitespace is encountered """
         while self.peek() and self.peek().isspace():
             self.read()
 
     def read_word(self):
+        """ Reads a sequence of alpha characters"""
         result = []
         self.skip_whitespace()
         while self.peek():
@@ -423,7 +402,9 @@ class Tokenizer:
         return "".join(result)
 
     def read_until(self, *args):
+        """ Reads tokens until the provided arguments are encountered """
         result = []
+        assert args
         stop = set(args)
         while self.peek() and self.peek() not in stop:
             result.append(self.read())
@@ -431,6 +412,7 @@ class Tokenizer:
         return "".join(result)
 
     def read_int(self):
+        """ Reads an integer """
         result = []
         self.skip_whitespace()
         while self.peek():

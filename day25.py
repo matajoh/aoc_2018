@@ -1,15 +1,26 @@
+""" Solution to day 25 of the 2018 Advent of Code """
+
 from collections import deque, namedtuple
 
 import numpy as np
 
 from utils import read_input, parse_args, diff
 
+
 class Point(namedtuple("Point", (("x", "y", "z", "t")))):
+    """ Class representing a space/time position """
+
     def __sub__(self, other):
-        return abs(other.x - self.x) + abs(other.y - self.y) + abs(other.z - self.z) + abs(other.t - self.t)
+        distance = abs(other.x - self.x)
+        distance += abs(other.y - self.y)
+        distance += abs(other.z - self.z)
+        distance += abs(other.t - self.t)
+
+        return distance
 
     @staticmethod
     def parse(text):
+        """ Parses a point from the line of text """
         parts = [int(part) for part in text.strip().split(',')]
         point = Point(*parts)
         actual = "{},{},{},{}".format(point.x, point.y, point.z, point.t)
@@ -18,6 +29,7 @@ class Point(namedtuple("Point", (("x", "y", "z", "t")))):
 
 
 def parse_points(lines):
+    """ Parse a list of points from the provided lines """
     lines = deque(lines)
     current = []
     while lines:
@@ -27,14 +39,16 @@ def parse_points(lines):
         else:
             yield current
             current = []
-    
+
     if current:
         yield current
 
 
 THRESHOLD = 3
 
+
 def build_constellation(edges, start, visited):
+    """ Build a constellation of points """
     num_points = edges.shape[0]
     constellation = set()
     nodes = [start]
@@ -46,11 +60,13 @@ def build_constellation(edges, start, visited):
             if edges[point, other] and other not in constellation:
                 constellation.add(other)
                 nodes.append(other)
-    
+
     return constellation
 
 
 def count_constellations(points):
+    """ Count the number of constellations in a list of points """
+
     num_points = len(points)
     edges = np.zeros((num_points, num_points), np.bool)
     for i in range(num_points):
@@ -65,12 +81,15 @@ def count_constellations(points):
     for i in range(num_points):
         if i in visited:
             continue
-        
+
         constellations.append(build_constellation(edges, i, visited))
-    
+
     return len(constellations)
 
+
 def debug():
+    """ Debut the solution """
+
     lines = read_input(25, True).split('\n')
     point_sets = list(parse_points(lines))
     expected_counts = [4, 3, 8]
@@ -79,7 +98,9 @@ def debug():
         actual = count_constellations(point_set)
         assert actual == expected, "{} != {}".format(actual, expected)
 
+
 def day25():
+    """ Solution to day 25 """
     args = parse_args()
     if args.debug:
         debug()

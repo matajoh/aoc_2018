@@ -1,10 +1,15 @@
-from collections import namedtuple, deque
+""" Solution to day 24 of the 2018 Advent of Code """
+
 import sys
+from collections import namedtuple, deque
 
-from utils import read_input, temp_file, parse_args, Tokenizer, diff
+from utils import read_input, parse_args, Tokenizer, diff
 
 
-class Unit(namedtuple("Unit", ("hit_points", "attack_power", "attack_type", "initiative", "weaknesses", "immunities"))):
+class Unit(namedtuple("Unit", ("hit_points", "attack_power", "attack_type",
+                               "initiative", "weaknesses", "immunities"))):
+    """ Class representing a unit type """
+
     def __lt__(self, other):
         return self.initiative > other.initiative
 
@@ -29,12 +34,15 @@ class Unit(namedtuple("Unit", ("hit_points", "attack_power", "attack_type", "ini
         return ""
 
     def weak_to(self, unit):
+        """ Whether this unit is weak to another unit's attack """
         return unit.attack_type in self.weaknesses
 
     def immune_to(self, unit):
+        """ Whether this unit is immune to another unit's attack """
         return unit.attack_type in self.immunities
 
     def boost(self, value):
+        """ Boosts this unit's attack power """
         return Unit(self.hit_points,
                     self.attack_power + value,
                     self.attack_type,
@@ -54,6 +62,8 @@ class Unit(namedtuple("Unit", ("hit_points", "attack_power", "attack_type", "ini
 
 
 class Group:
+    """ Class representing a group of units """
+
     def __init__(self, unit, num_units, membership, index):
         self.unit = unit
         self.num_units = num_units
@@ -61,13 +71,16 @@ class Group:
         self.index = index
 
     def boost(self, value):
+        """ Boosts this group """
         self.unit = self.unit.boost(value)
 
     @property
     def effective_power(self):
+        """ Returns this group's effective power """
         return self.num_units * self.unit.attack_power
 
     def attack(self, target, verbose):
+        """ Attack the target """
         damage = self.effective_power
         if target.unit.weak_to(self.unit):
             damage *= 2
@@ -82,6 +95,7 @@ class Group:
             ))
 
     def take_damage(self, damage):
+        """ Take damage from an attack """
         num_killed = damage // self.unit.hit_points
         num_killed = min(num_killed, self.num_units)
         self.num_units -= num_killed
@@ -98,6 +112,8 @@ class Group:
         return False
 
     def select_target(self, groups, verbose):
+        """ Select a target to attack """
+
         max_damage = 0
         target = None
         template = "{} group {} would deal defending group {} {} damage"
@@ -131,6 +147,8 @@ class Group:
 
     @staticmethod
     def parse(text, membership, index, verbose):
+        """ Parse a group from the line of text """
+
         tokens = Tokenizer(text)
         num_units = tokens.read_int()
         tokens.consume(" units each with ")
@@ -178,6 +196,7 @@ class Group:
 
 
 def parse_groups(lines, verbose):
+    """ Parse the Immune System and Infection groups from the input """
     if not isinstance(lines, deque):
         lines = deque(lines)
 
@@ -204,9 +223,10 @@ def parse_groups(lines, verbose):
     return immune, infection
 
 
-def add_side_state(side, lines):
-    if side:
-        for group in side:
+def add_army_state(army, lines):
+    """ Add state about an army to the list of lines """
+    if army:
+        for group in army:
             lines.append("Group {} contains {} units".format(
                 group.index, group.num_units))
     else:
@@ -214,14 +234,16 @@ def add_side_state(side, lines):
 
 
 def battle_state(immune, infection):
+    """ Return a string representing the state of the battle """
     lines = ["Immune System:"]
-    add_side_state(immune, lines)
+    add_army_state(immune, lines)
     lines.append("Infection:")
-    add_side_state(infection, lines)
+    add_army_state(infection, lines)
     return "\n".join(lines)
 
 
 def count_units(army):
+    """ Count the number of units in an army """
     num_units = 0
     for group in army:
         num_units += group.num_units
@@ -230,6 +252,7 @@ def count_units(army):
 
 
 def selection_phase(immune, infection, verbose):
+    """ Have the groups select targets """
     if verbose:
         print()
 
@@ -254,6 +277,7 @@ def selection_phase(immune, infection, verbose):
 
 
 def attack_phase(immune, infection, selections, verbose):
+    """ Have the groups attack their targets """
     if verbose:
         print()
 
@@ -272,6 +296,7 @@ def attack_phase(immune, infection, selections, verbose):
 
 
 def do_battle(immune, infection, verbose, boost=0):
+    """ Perform a battle until it ends with one side winning or a draw """
     if verbose:
         print()
 
@@ -289,7 +314,7 @@ def do_battle(immune, infection, verbose, boost=0):
         selections = selection_phase(immune, infection, verbose)
         immune, infection = attack_phase(
             immune, infection, selections, verbose)
-        
+
         after = count_units(immune) + count_units(infection)
 
         if before == after:
@@ -305,6 +330,7 @@ def do_battle(immune, infection, verbose, boost=0):
 
 
 def debug(lines, verbose):
+    """ Debug the logic """
     line_queue = deque(lines)
     immune, infection = parse_groups(line_queue, verbose)
 
@@ -332,6 +358,7 @@ def debug(lines, verbose):
 
 
 def part1(lines, verbose):
+    """ Solution to part 1 """
     immune, infection = parse_groups(lines, verbose)
 
     immune, infection = do_battle(immune, infection, verbose)
@@ -345,6 +372,7 @@ def part1(lines, verbose):
 
 
 def find_boost(lines, start, end, verbose):
+    """ Perform a binary search to find the right amount of boost """
     print("Evaluating range", start, "=>", end)
     if start + 1 == end:
         return end
@@ -355,7 +383,7 @@ def find_boost(lines, start, end, verbose):
 
     if immune and infection:
         return find_boost(lines, boost, end, verbose)
-    
+
     if immune:
         return find_boost(lines, start, boost, verbose)
 
@@ -363,7 +391,8 @@ def find_boost(lines, start, end, verbose):
 
 
 def part2(lines, verbose):
-    boost = find_boost(lines, 0, 10000, verbose)
+    """ Solution to part 2 """
+    boost = find_boost(lines, 0, 100, verbose)
 
     immune, infection = parse_groups(lines, verbose)
     immune, infection = do_battle(immune, infection, verbose, boost)
@@ -374,6 +403,7 @@ def part2(lines, verbose):
 
 
 def day24():
+    """ Solution to day 24 """
     args = parse_args()
 
     lines = read_input(24, args.debug).split('\n')
