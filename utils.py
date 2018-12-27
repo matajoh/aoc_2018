@@ -3,6 +3,7 @@
 import os
 import argparse
 import itertools
+import logging
 import heapq
 from collections import deque
 from subprocess import Popen, PIPE, STDOUT
@@ -13,12 +14,16 @@ import numpy as np
 PATH_TEMPLATE = "day{}_{}input.txt"
 
 
-def read_input(day, debug=False):
+def read_input(day, debug=False, no_split=False):
     """ Read the input for a particular day """
     path = PATH_TEMPLATE.format(day, "debug_" if debug else "")
     path = os.path.join("inputs", path)
     with open(path) as file:
-        return file.read()
+        contents = file.read()
+        if no_split:
+            return contents
+
+        return [line.strip() for line in contents.split('\n')]
 
 
 TEMP_DIR = "temp"
@@ -40,7 +45,12 @@ def parse_args():
     parser.add_argument("--verbose", action="store_true")
     parser.add_argument("--video", action="store_true")
     parser.add_argument("--num_video_frames", type=int, default=0)
-    return parser.parse_args()
+    args = parser.parse_args()
+
+    if args.verbose:
+        logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.DEBUG)
+
+    return args
 
 
 VIDEO_DIR = "videos"

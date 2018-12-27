@@ -1,11 +1,13 @@
 """ Solution to day 2 of the 2018 Advent of Code """
 
 from itertools import groupby
-from utils import read_input
+import logging
+from utils import read_input, parse_args
 
 
-def part1(tags):
-    """ Solution to part 1 """
+def compute_checksum(tags):
+    """ Compute the checksum for the tags """
+
     num_twos = 0
     num_threes = 0
 
@@ -25,13 +27,13 @@ def part1(tags):
         if has_three:
             num_threes += 1
 
-    print("twos:", num_twos)
-    print("threes:", num_threes)
-    print(num_twos * num_threes)
+    logging.debug("twos = %d", num_twos)
+    logging.debug("threes = %d", num_threes)
+    return num_twos * num_threes
 
 
-def part2(tags):
-    """ Solution to part 2 """
+def find_common_letters(tags):
+    """ Find the common letters between the two most different tags """
     length = len(tags[0])
 
     for pos in range(length):
@@ -46,17 +48,20 @@ def part2(tags):
                 subtags.add(subtag)
 
         if found:
-            print(found)
-            break
+            return found
+
+    return None
 
 
 def day2():
     """ Day 2 solution """
-    tags = read_input(2).split('\n')
+    parse_args()
+
+    tags = read_input(2)
     print("Part 1")
-    part1(tags)
+    print(compute_checksum(tags))
     print("Part 2")
-    part2(tags)
+    print(find_common_letters(tags))
 
 
 if __name__ == "__main__":

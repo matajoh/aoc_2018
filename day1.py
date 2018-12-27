@@ -3,23 +3,8 @@
 from utils import read_input
 
 
-def line_to_int(line):
-    """ Convert a line to an integer """
-    line = line.strip()
-
-    if line.startswith('+'):
-        return int(line[1:])
-
-    return -int(line[1:])
-
-
-def part1(values):
-    """ Solution to part 1 """
-    print(sum(values, 0))
-
-
-def part2(values):
-    """ Solution to part 2 """
+def find_repeating_frequency(values):
+    """ Find the first time a running sum repeats """
     frequencies = set([0])
 
     index = 0
@@ -38,18 +23,18 @@ def part2(values):
         if found:
             break
 
-    print(frequency)
+    return frequency
 
 
 def day1():
     """ Day 1 solution """
-    lines = read_input(1).split('\n')
-    values = [line_to_int(line) for line in lines]
+    lines = read_input(1)
+    values = [int(line) for line in lines]
 
     print("Part 1")
-    part1(values)
+    print(sum(values, 0))
     print("Part 2")
-    part2(values)
+    print(find_repeating_frequency(values))
 
 
 if __name__ == "__main__":

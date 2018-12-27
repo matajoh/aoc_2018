@@ -1,23 +1,36 @@
 """ Solution to day 3 of the 2018 Advent of Code """
 
+from collections import namedtuple
+import re
 import numpy as np
-from utils import read_input
+from utils import read_input, diff
 
 
-class Rect:
-    """ Class encapsulating a rectangle """
+PATTERN = (r"^#(?P<index>\d+) @ "
+           r"(?P<left>\d+),(?P<top>\d+): "
+           r"(?P<width>\d+)x(?P<height>\d+)$")
 
-    def __init__(self, spec):
-        parts = spec.split('@')
-        self.id = parts[0][1:].strip() #pylint: disable=C0103
 
-        parts = parts[1].split(':')
-        left, top = parts[0].split(',')
-        width, height = parts[1].split('x')
-        self.left = int(left.strip())
-        self.top = int(top.strip())
-        self.width = int(width.strip())
-        self.height = int(height.strip())
+class Claim(namedtuple("Rect", ("index", "left", "top", "width", "height"))):
+    """ Class encapsulating a rectangular claim """
+
+    regex = re.compile(PATTERN)
+
+    @staticmethod
+    def parse(spec):
+        """ Parse a Rect from the specification """
+        match = Claim.regex.match(spec)
+        claim = Claim(int(match.group("index")),
+                      int(match.group("left")),
+                      int(match.group("top")),
+                      int(match.group("width")),
+                      int(match.group("height")))
+        assert str(claim) == spec, diff(str(claim), spec)
+        return claim
+
+    def __repr__(self):
+        return "#{} @ {},{}: {}x{}".format(self.index, self.left,
+                                           self.top, self.width, self.height)
 
     @property
     def right(self):
@@ -30,41 +43,37 @@ class Rect:
         return self.top + self.height
 
     def draw(self, canvas):
-        """ Draws the rectangle to the provided canvas """
-        for row in range(self.top, self.bottom):
-            for col in range(self.left, self.right):
-                canvas[row, col] += 1
+        """ Draws the claim to the provided canvas """
+        patch = canvas[self.top:self.bottom, self.left:self.right]
+        canvas[self.top:self.bottom, self.left:self.right] = patch + 1
 
     def no_overlap(self, canvas):
-        """ Tests for overlap with other rectangles """
+        """ Tests for overlap with other claims """
         overlap_sum = np.sum(canvas[self.top:self.bottom, self.left:self.right])
         return overlap_sum == self.width*self.height
 
 
-def part1(canvas, claims):
-    """ Solution to part 1 """
-    for claim in claims:
-        claim.draw(canvas)
-
-    print(np.sum(canvas >= 2))
-
-
-def part2(canvas, claims):
-    """ Solution to part 2 """
+def find_non_overlapping_claim(canvas, claims):
+    """ Find the claim which does not overlap any others """
     for claim in claims:
         if claim.no_overlap(canvas):
-            print(claim.id)
+            return claim.index
+
+    return None
 
 
 def day3():
     """ Solution to day 3 """
-    lines = read_input(3).split('\n')
-    claims = [Rect(line) for line in lines]
+    lines = read_input(3)
+    claims = [Claim.parse(line) for line in lines]
     canvas = np.zeros((1000, 1000), np.int32)
+    for claim in claims:
+        claim.draw(canvas)
+
     print("Part 1")
-    part1(canvas, claims)
+    print(np.sum(canvas >= 2))
     print("Part 2")
-    part2(canvas, claims)
+    print(find_non_overlapping_claim(canvas, claims))
 
 
 if __name__ == "__main__":
