@@ -2,6 +2,7 @@
 
 from utils import read_input
 
+# TODO rewrite to use linked lists
 
 def reduce(polymer, reduced):
     """ Reduce the polymer following the rules """
@@ -63,7 +64,7 @@ def part2(original_polymer):
 
 def day5():
     """ Solution to day 5 """
-    polymer = read_input(5)
+    polymer = read_input(5, no_split=True)
     print("Part 1")
     part1(polymer)
     print("Part 2")

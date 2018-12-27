@@ -48,7 +48,8 @@ def parse_args():
     args = parser.parse_args()
 
     if args.verbose:
-        logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.DEBUG)
+        logging.basicConfig(
+            format='%(levelname)s: %(message)s', level=logging.DEBUG)
 
     return args
 
@@ -150,6 +151,14 @@ class Point:
 
     def __add__(self, other):
         return Point(self._row + other.row, self._col + other.col)
+
+
+def assert_equal(actual, expected):
+    """ Assert the two values are equal, and print an appropriate error message """
+    if isinstance(actual, str):
+        assert actual == expected, diff(actual, expected)
+
+    assert actual == expected, "{} != {}".format(actual, expected)
 
 
 def diff(actual, expected):
@@ -257,6 +266,7 @@ class AStarSearch:
 
 class MaxClique:
     """ Find the maximum clique in a graph """
+
     def __init__(self, edges, verbose):
         self._edges = edges
         self._current = []
@@ -370,6 +380,7 @@ class PriorityQueue:
 
 class Tokenizer:
     """ Tokenizes a string and provides useful parsing abilities """
+
     def __init__(self, text):
         self.tokens = deque(text)
 

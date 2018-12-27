@@ -1,9 +1,13 @@
 """ Solution to day 4 of the 2018 Advent of Code """
 
+import logging
 from datetime import datetime
 from enum import Enum
+from collections import namedtuple
+
 import numpy as np
-from utils import read_input
+
+from utils import read_input, parse_args, assert_equal
 
 FORMAT = "%Y-%m-%d %H:%M"
 
@@ -15,24 +19,30 @@ class EntryType(Enum):
     Sleep = 2
 
 
-class LogEntry:
+class LogEntry(namedtuple("LogEntry", ("time", "type", "guard"))):
     """ An entry in the guard log """
 
-    def __init__(self, line):
-        line = line.strip()
-        self.time = datetime.strptime(line[1:17], FORMAT)
+    @staticmethod
+    def parse(line):
+        """ Parse a log entry from the line """
+        time = datetime.strptime(line[1:17], FORMAT)
         end = line[18:].strip()
-        self.guard = None
+        guard = None
         if end == "wakes up":
-            self.type = EntryType.Wake
+            entry_type = EntryType.Wake
         elif end == "falls asleep":
-            self.type = EntryType.Sleep
+            entry_type = EntryType.Sleep
         else:
-            self.type = EntryType.Start
+            entry_type = EntryType.Start
             parts = end.split()
-            self.guard = int(parts[1][1:].strip())
+            guard = int(parts[1][1:].strip())
 
-        assert line == str(self), line + " != " + str(self)
+        entry = LogEntry(time, entry_type, guard)
+        assert_equal(str(entry), line)
+        return entry
+
+    def __lt__(self, other):
+        return self.time < other.time
 
     def __repr__(self):
         if self.type == EntryType.Wake:
@@ -48,75 +58,85 @@ class LogEntry:
         )
 
 
-def part1(record, guards):
-    """ Solution to part 1 """
+def sleepiest_guard(record, guards):
+    """ Find the sleepliest guard is most likely to be asleep """
     sums = record.sum(axis=1)
     max_guard = np.argmax(sums)
 
     max_minute = np.argmax(record[max_guard])
 
-    print("max_guard:", guards[max_guard])
-    print("max_minute:", max_minute)
-    print("result:", guards[max_guard] * max_minute)
+    logging.debug("max_guard: %d", guards[max_guard])
+    logging.debug("max_minute: %d", max_minute)
+    return guards[max_guard] * max_minute
 
 
-def part2(record, guards):
-    """ Solution to part 2 """
+def most_consistently_sleepy_guard(record, guards):
+    """ Find the guard who is most consistently asleep at the same time """
     max_index = np.argmax(record)
     max_guard, max_minute = np.unravel_index(max_index, [len(guards), 60])
     assert np.max(record) == record[max_guard, max_minute]
-    print("max_guard:", guards[max_guard])
-    print("max_minute:", max_minute)
-    print("result:", guards[max_guard] * max_minute)
+    logging.debug("max_guard: %d", guards[max_guard])
+    logging.debug("max_minute: %d", max_minute)
+    return guards[max_guard] * max_minute
 
 
-def day4():
-    """ Solution to day 4 """
-    lines = read_input(4).split('\n')
-    entries = [LogEntry(line) for line in lines]
-    entries.sort(key=lambda entry: entry.time)
+def fill_in_guards(entries):
+    """ Fill in the guard values for all entries """
     guards = set()
     guard = entries[0].guard
-    for entry in entries:
+    for i, entry in enumerate(entries):
         if entry.type == EntryType.Start:
             guard = entry.guard
         else:
-            entry.guard = guard
+            entries[i] = LogEntry(entry.time, entry.type, guard)
 
         guards.add(entry.guard)
 
-    guards = list(guards)
+    return list(guards)
+
+
+def create_record(entries, guards):
+    """ Create a by-minute record for guard sleepiness """
+    record = np.zeros((len(guards), 60), np.int32)
 
     guard_lookup = {
         guard: index for index, guard in enumerate(guards)
     }
 
-    record = np.zeros((len(guards), 60), np.int32)
-
     index = 0
     while index < len(entries):
         entry = entries[index]
-        assert entry.type == EntryType.Start, "{} != Start @ {}".format(
-            entry.type, index)
+        assert_equal(entry.type, EntryType.Start)
         guard = entry.guard
         row = guard_lookup[guard]
         index += 1
         while index < len(entries) and entries[index].type != EntryType.Start:
-            assert entries[index].type == EntryType.Sleep, "{} != Sleep @ {}".format(
-                entry.type, index)
-            assert entries[index].guard == guard, "{} != {} @ {}".format(
-                entry.guard, guard, index)
+            assert_equal(entries[index].type, EntryType.Sleep)
+            assert_equal(entries[index].guard, guard)
             start = entries[index].time.minute
             end = entries[index+1].time.minute
             index += 2
             for col in range(start, end):
                 record[row, col] += 1
 
+    return record
+
+
+def day4():
+    """ Solution to day 4 """
+    parse_args()
+    lines = read_input(4)
+    entries = [LogEntry.parse(line) for line in lines]
+    entries.sort()
+
+    guards = fill_in_guards(entries)
+    record = create_record(entries, guards)
+
     print("Part 1")
-    part1(record, guards)
+    print(sleepiest_guard(record, guards))
 
     print("Part 2")
-    part2(record, guards)
+    print(most_consistently_sleepy_guard(record, guards))
 
 
 if __name__ == "__main__":
