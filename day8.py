@@ -1,6 +1,7 @@
 """ Solution to day 8 of the 2018 Advent of Code """
 
 from collections import deque
+import logging
 
 from anytree import Node, RenderTree
 
@@ -44,11 +45,6 @@ def compute_metadata_sum(node):
     return metadata_sum
 
 
-def part1(root):
-    """ Solution to part 1 """
-    print("Metadata sum:", compute_metadata_sum(root))
-
-
 def compute_node_value(node):
     """ Compute the value of a node """
     value = 0
@@ -64,31 +60,45 @@ def compute_node_value(node):
     return value
 
 
-def part2(root):
-    """ Solution to part 2 """
-    print("Root value:", compute_node_value(root))
+def parse_tree(text):
+    """ Parse a tree from the text """
+    tokens = [int(part) for part in text.split()]
+    tokens = deque(tokens)
+
+    root, node_count = parse_node(None, tokens, 0)
+
+    assert not tokens
+    logging.debug("Node count: %d", node_count)
+    logging.debug(RenderTree(root))
+
+    return root
+
+
+def test_day8():
+    """ Test for day 8 """
+
+    root = parse_tree(DEBUG)
+
+    expected = 138
+    actual = compute_metadata_sum(root)
+    assert actual == expected
+
+    expected = 66
+    actual = compute_node_value(root)
+    assert actual == expected
 
 
 def day8():
     """ Solution to day 8 """
-    args = parse_args()
+    parse_args()
 
-    if args.debug:
-        tokens = deque([int(token) for token in DEBUG.split()])
-    else:
-        tokens = deque([int(token) for token in read_input(8).split()])
-
-    root, node_count = parse_node(None, tokens, 0)
-    assert not tokens
-
-    print("Node Count:", node_count)
-    print(RenderTree(root))
+    root = parse_tree(read_input(8, no_split=True))
 
     print("Part 1")
-    part1(root)
+    print(compute_metadata_sum(root))
 
     print("Part 2")
-    part2(root)
+    print(compute_node_value(root))
 
 
 if __name__ == "__main__":
