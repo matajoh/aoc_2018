@@ -1,19 +1,20 @@
 """ Solution to day 7 of the 2018 Advent of Code """
 
 import heapq
+import logging
 
 from utils import read_input, parse_args
 
 
-DEBUG = (
-    "Step C must be finished before step A can begin.\n"
-    "Step C must be finished before step F can begin.\n"
-    "Step A must be finished before step B can begin.\n"
-    "Step A must be finished before step D can begin.\n"
-    "Step B must be finished before step E can begin.\n"
-    "Step D must be finished before step E can begin.\n"
+TEST = [
+    "Step C must be finished before step A can begin.",
+    "Step C must be finished before step F can begin.",
+    "Step A must be finished before step B can begin.",
+    "Step A must be finished before step D can begin.",
+    "Step B must be finished before step E can begin.",
+    "Step D must be finished before step E can begin.",
     "Step F must be finished before step E can begin."
-)
+]
 
 
 class Step:
@@ -25,6 +26,10 @@ class Step:
         self.num_complete = 0
         self.parents = []
         self.children = []
+
+    def reset(self):
+        """ Reset the task """
+        self.num_complete = 0
 
     def complete(self):
         """ Complete the step, notifying children """
@@ -53,8 +58,17 @@ def add_edge(steps, line, base_time):
     steps[key1].parents.append(steps[key0])
 
 
-def part1(step_lookup):
-    """ Solution to part 1 """
+def build_step_lookup(lines, base_time):
+    """ Build the step lookup dictionary """
+    step_lookup = {}
+    for line in lines:
+        add_edge(step_lookup, line, base_time)
+
+    return step_lookup
+
+
+def find_order_of_instructions(step_lookup):
+    """ Find the order in which the instructions should be completed """
     unready = list(step_lookup.keys())
     order = []
     steps = []
@@ -78,11 +92,11 @@ def part1(step_lookup):
 
         unready = update
 
-    print("".join(order))
+    return "".join(order)
 
 
-def part2(step_lookup, num_workers):
-    """ Solution to part 2 """
+def compute_duration(step_lookup, num_workers):
+    """ Determine how long it will take to complete the task. """
     unready = list(step_lookup.keys())
     order = []
     steps = []
@@ -99,9 +113,10 @@ def part2(step_lookup, num_workers):
 
     num_seconds = 0
     while steps or current_steps:
-        parts = [step.name for step in current_steps]
-        parts = [num_seconds] + parts + ["".join(order)]
-        print(*parts)
+        logging.debug("%d %s %s",
+                      num_seconds,
+                      " ".join([step.name for step in current_steps]),
+                      "".join(order))
 
         num_seconds += 1
         for step in current_steps:
@@ -127,36 +142,48 @@ def part2(step_lookup, num_workers):
             step = step_lookup[heapq.heappop(steps)]
             current_steps.append(step)
 
-    print("".join(order))
-    print(num_seconds)
+    logging.debug("".join(order))
+    return num_seconds
+
+
+def test_day7():
+    """ Test for day 7 """
+
+    lines = TEST
+    base_time = 0
+    num_workers = 2
+    step_lookup = build_step_lookup(lines, base_time)
+
+    expected = "CABDFE"
+    actual = find_order_of_instructions(step_lookup)
+    assert actual == expected
+
+    for step in step_lookup.values():
+        step.reset()
+
+    expected = 15
+    actual = compute_duration(step_lookup, num_workers)
+    assert actual == expected
 
 
 def day7():
     """ Solution to day 7 """
-    args = parse_args()
+    parse_args()
 
-    if args.debug:
-        lines = DEBUG.split('\n')
-        base_time = 0
-        num_workers = 2
-    else:
-        lines = read_input(7).split('\n')
-        base_time = 60
-        num_workers = 5
+    lines = read_input(7)
+    base_time = 60
+    num_workers = 5
 
-    step_lookup = {}
-    for line in lines:
-        add_edge(step_lookup, line, base_time)
+    step_lookup = build_step_lookup(lines, base_time)
 
     print("Part 1")
-    part1(step_lookup)
+    print(find_order_of_instructions(step_lookup))
 
-    step_lookup = {}
-    for line in lines:
-        add_edge(step_lookup, line, base_time)
+    for step in step_lookup.values():
+        step.reset()
 
     print("Part 2")
-    part2(step_lookup, num_workers)
+    print(compute_duration(step_lookup, num_workers))
 
 
 if __name__ == "__main__":
