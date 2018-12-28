@@ -14,9 +14,9 @@ import numpy as np
 PATH_TEMPLATE = "day{}_{}input.txt"
 
 
-def read_input(day, debug=False, no_split=False):
+def read_input(day, test=False, no_split=False):
     """ Read the input for a particular day """
-    path = PATH_TEMPLATE.format(day, "debug_" if debug else "")
+    path = PATH_TEMPLATE.format(day, "test_" if test else "")
     path = os.path.join("inputs", path)
     with open(path) as file:
         contents = file.read()

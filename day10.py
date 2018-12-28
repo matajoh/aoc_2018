@@ -5,6 +5,17 @@ import matplotlib.pyplot as plt
 
 from utils import read_input, parse_args
 
+EXPECTED = [
+    [1, 0, 0, 0, 1, 0, 0, 1, 1, 1],
+    [1, 0, 0, 0, 1, 0, 0, 0, 1, 0],
+    [1, 0, 0, 0, 1, 0, 0, 0, 1, 0],
+    [1, 1, 1, 1, 1, 0, 0, 0, 1, 0],
+    [1, 0, 0, 0, 1, 0, 0, 0, 1, 0],
+    [1, 0, 0, 0, 1, 0, 0, 0, 1, 0],
+    [1, 0, 0, 0, 1, 0, 0, 0, 1, 0],
+    [1, 0, 0, 0, 1, 0, 0, 1, 1, 1]
+]
+
 
 def parse_pair(text):
     """ Parse a pair of numbers """
@@ -12,36 +23,33 @@ def parse_pair(text):
     return int(parts[0].strip()), int(parts[1].strip())
 
 
-class Point:
-    """ Class representing a moving point """
+def parse_line(line):
+    """ Parse a line of input text """
+    left = line.index('<') + 1
+    right = line.index('>')
+    col, row = parse_pair(line[left:right])
 
-    def __init__(self, line):
-        left = line.index('<') + 1
-        right = line.index('>')
-        self.col, self.row = parse_pair(line[left:right])
+    left = line.index('<', right) + 1
+    right = line.index('>', left)
+    dcol, drow = parse_pair(line[left:right])
 
-        left = line.index('<', right) + 1
-        right = line.index('>', left)
-        self.dcol, self.drow = parse_pair(line[left:right])
+    return row, col, drow, dcol
 
-    def move(self, multiplier=1):
-        """ Moves the point """
-        self.row += self.drow*multiplier
-        self.col += self.dcol*multiplier
 
-    def __repr__(self):
-        return "({}, {}) @ ({}, {})".format(self.col, self.row,
-                                            self.dcol, self.drow)
+def parse_input(lines):
+    """ Parse the input and return the points and velocities """
+    values = np.array([parse_line(line) for line in lines], np.int32)
+    return values[:, :2], values[:, 2:]
 
 
 class Rect:
     """ Class representing a rectangle """
 
     def __init__(self, left, top, right, bottom):
-        self.left = left
-        self.top = top
-        self.width = right - left
-        self.height = bottom - top
+        self.left = int(left)
+        self.top = int(top)
+        self.width = int(right - left)
+        self.height = int(bottom - top)
 
     @property
     def size(self):
@@ -69,55 +77,56 @@ class Rect:
 
 def compute_bounding_box(points):
     """ Compute the bounding box that contains the provided points """
-    min_row, min_col = points[0].row, points[0].col
-    max_row, max_col = min_row, min_col
-
-    for point in points:
-        min_row = min((min_row, point.row))
-        min_col = min((min_col, point.col))
-        max_row = max((max_row, point.row))
-        max_col = max((max_col, point.col))
-
+    min_row, min_col = np.min(points, axis=0)
+    max_row, max_col = np.max(points, axis=0)
     return Rect(min_col, min_row, max_col + 1, max_row + 1)
+
+
+def find_message(lines):
+    """ Find the message that the points will eventually make """
+    points, velocities = parse_input(lines)
+    box = compute_bounding_box(points)
+
+    size = box.size
+    num_seconds = 0
+    while True:
+        points += velocities
+        box = compute_bounding_box(points)
+        if box.size > size:
+            points -= velocities
+            break
+
+        size = box.size
+        num_seconds += 1
+
+    box = compute_bounding_box(points)
+    canvas = np.zeros((box.height, box.width), np.bool)
+    points = points - (box.top, box.left)
+    canvas[points[:, 0], points[:, 1]] = True
+    return canvas, num_seconds
+
+
+def test_day10():
+    """ Test for day 10 """
+    lines = read_input(10, True)
+    actual, num_seconds = find_message(lines)
+    expected = np.array(EXPECTED, np.bool)
+    np.testing.assert_array_equal(actual, expected)
+
+    assert num_seconds == 3
 
 
 def day10():
     """ Solution to day 10 """
-    args = parse_args()
+    parse_args()
 
-    if args.debug:
-        lines = read_input(10, True).split('\n')
-        rollout = 10
-    else:
-        lines = read_input(10).split("\n")
-        rollout = 15000
-
-    points = [Point(line) for line in lines]
-    box = compute_bounding_box(points)
-    size = box.size
-    for second in range(rollout):
-        for point in points:
-            point.move()
-
-        box = compute_bounding_box(points)
-        if box.size > size:
-            for point in points:
-                point.move(-1)
-
-            print("Took", second, "seconds")
-            break
-        else:
-            size = box.size
-
-    box = compute_bounding_box(points)
-    canvas = np.zeros((box.height, box.width), np.bool)
-    for point in points:
-        row = point.row - box.top
-        col = point.col - box.left
-        canvas[row, col] = True
-
+    lines = read_input(10)
+    canvas, num_seconds = find_message(lines)
+    print("Part 1")
     plt.imshow(canvas)
     plt.show()
+    print("Part 2")
+    print(num_seconds)
 
 
 if __name__ == "__main__":
