@@ -1,10 +1,13 @@
 """ Solution to day 9 of the 2018 Advent of Code """
 
 from collections import deque
+import logging
+
+import pytest
 
 from utils import parse_args
 
-DEBUG = [
+TEST = [
     (9, 25, 32),
     (10, 1618, 8317),
     (13, 7999, 146373),
@@ -12,9 +15,8 @@ DEBUG = [
     (21, 6111, 54718),
     (30, 5807, 37305)
 ]
-TEST = [(419, 72164, -1),
-        (419, 7216400, -1)]
-FORMAT = "{} players; last marble is worth {} points: high score is {} [{}]"
+
+FORMAT = "{} players; last marble is worth {} points: high score is {}"
 
 
 class Marble:
@@ -47,98 +49,112 @@ class Marble:
 
         return current.clockwise, current.value
 
+    def __repr__(self):
+        return "Marble(value={})".format(self.value)
 
-def print_circle(player, current):
-    """ Prints the current state of the circle.
 
-    Args:
-        player -- the player who just went
-        current -- the current marble
-    """
-    values = deque()
-    marble = current
-    values.append(marble.value)
-    min_value = marble.value
-    marble = marble.clockwise
-    while marble != current:
+class Game:
+    """ Class representing the marble game """
+
+    def __init__(self, num_players):
+        self.num_players = num_players
+        self.scores = None
+        self.current = None
+        self.player = None
+        self.reset()
+
+    def reset(self):
+        """ Resets the state of the game """
+        self.scores = [0]*self.num_players
+        self.current = Marble(0)
+        self.current.clockwise = self.current
+        self.current.counterclockwise = self.current
+        self.player = None
+
+    def __repr__(self):
+        values = deque()
+        marble = self.current
         values.append(marble.value)
-        if marble.value < min_value:
-            min_value = marble.value
-
+        min_value = marble.value
         marble = marble.clockwise
+        while marble != self.current:
+            values.append(marble.value)
+            if marble.value < min_value:
+                min_value = marble.value
 
-    while values[0] != min_value:
-        values.append(values.popleft())
+            marble = marble.clockwise
 
-    if player is None:
-        output = ["[-]"]
-    else:
-        output = ["[{}]".format(player)]
+        while values[0] != min_value:
+            values.append(values.popleft())
 
-    for value in values:
-        if value == current.value:
-            output.append("({})".format(value))
+        if self.player is None:
+            output = ["[-]"]
         else:
-            output.append(str(value))
+            output = ["[{}]".format(self.player + 1)]
 
-    print(" ".join(output))
+        for value in values:
+            if value == self.current.value:
+                output.append("({})".format(value))
+            else:
+                output.append(str(value))
+
+        return " ".join(output)
+
+    def play(self, last_marble):
+        """ Plays a game
+
+        Args:
+            last_marble -- the value of the last marble
+        """
+        logging.debug("%s", self)
+
+        self.player = 0
+        for i in range(last_marble):
+            value = i + 1
+            if value % 23 == 0:
+                self.current, removed = self.current.remove()
+                self.scores[self.player] += removed + value
+            else:
+                self.current = self.current.insert(value)
+
+            logging.debug("%s", self)
+
+            self.player = (self.player + 1) % self.num_players
+
+        num_expected = last_marble - 2 * (last_marble // 23) + 1
+        num_actual = 1
+        marble = self.current
+        while marble.clockwise != self.current:
+            marble = marble.clockwise
+            num_actual += 1
+
+        assert num_actual == num_expected, "{} != {}".format(
+            num_actual, num_expected)
+        return max(self.scores)
 
 
-def play_game(num_players, last_marble, verbose):
-    """ Plays a game
-
-    Args:
-        num_players -- the number of players
-        last_marble -- the value of the last marble
-        verbose -- whether to output the per-turn state
-    """
-    scores = [0]*num_players
-    current = Marble(0)
-    current.clockwise = current
-    current.counterclockwise = current
-
-    if verbose:
-        print_circle(None, current)
-
-    for i in range(last_marble):
-        value = i + 1
-        if value % 23 == 0:
-            current, removed = current.remove()
-            scores[i % num_players] += removed + value
-        else:
-            current = current.insert(value)
-
-        if verbose:
-            print_circle((i % num_players) + 1, current)
-
-    num_expected = last_marble - 2 * (last_marble // 23) + 1
-    num_actual = 1
-    marble = current
-    while marble.clockwise != current:
-        marble = marble.clockwise
-        num_actual += 1
-
-    assert num_actual == num_expected, "{} != {}".format(
-        num_actual, num_expected)
-    return max(scores)
+@pytest.mark.parametrize("num_players, last_marble, expected", TEST)
+def test_day9(num_players, last_marble, expected):
+    """ Test for day 9 """
+    for num_players, last_marble, expected in TEST:
+        game = Game(num_players)
+        actual = game.play(last_marble)
+        assert actual == expected
 
 
 def day9():
     """ Solution to Day 9 """
-    args = parse_args()
+    parse_args()
 
-    if args.debug:
-        games = DEBUG
-    else:
-        games = TEST
+    game = Game(419)
 
-    for game in games:
-        num_players, last_marble, expected_score = game
-        actual_score = play_game(num_players, last_marble, args.verbose)
-        print(FORMAT.format(num_players, last_marble,
-                            actual_score, expected_score))
-        if args.verbose:
-            break
+    print("Part 1")
+    print(game.play(72164))
+
+    game.reset()
+
+    print("Part 2")
+    print(game.play(7216400))
 
 
 if __name__ == "__main__":
