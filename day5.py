@@ -2,7 +2,7 @@
 
 import logging
 
-from utils import read_input, assert_equal, parse_args
+from utils import read_input, parse_args
 
 START = "<start>"
 END = "<end>"
@@ -73,7 +73,7 @@ def test_day5():
     actual = react(test_input)
     expected = 10
 
-    assert_equal(actual, expected)
+    assert actual == expected
 
     cases = [
         ('a', 6),
@@ -84,11 +84,11 @@ def test_day5():
 
     for unit, expected in cases:
         actual = react(test_input, unit)
-        assert_equal(actual, expected)
+        assert actual == expected
 
     expected = 4
     actual = improve(test_input)
-    assert_equal(actual, expected)
+    assert actual == expected
 
 
 def improve(polymer):
@@ -100,7 +100,7 @@ def improve(polymer):
         if length < min_length:
             min_length = length
 
-        logging.debug("element: %d length: %d", element, length)
+        logging.debug("element: %s length: %d", element, length)
 
     return min_length
 

@@ -13,18 +13,28 @@ def read_location(line):
     return row, col
 
 
-def part1(field):
-    """ Solution to part 1 """
+def build_field(size, locations):
+    """ Find the distances in the field to all locations """
+    num_locations = len(locations)
 
-    size, _, num_locations = field.shape
-    nearest = np.zeros((size, size), np.int32)
-    for row in range(size):
-        for col in range(size):
-            min_dist = np.min(field[row, col])
-            if np.sum(field[row, col] == min_dist) == 2:
-                nearest[row, col] = -1
-            else:
-                nearest[row, col] = np.argmin(field[row, col])
+    print("Building field...")
+    field = np.zeros((num_locations, size, size), np.int32)
+    values = np.arange(size*size).reshape(size, size)
+    row_values = values // size
+    col_values = values % size
+    for i, (row, col) in enumerate(locations):
+        field[i] = np.abs(row_values - row) + np.abs(col_values - col)
+
+    return field
+
+
+def largest_finite_area(field):
+    """ Find the largest finite area """
+
+    num_locations = field.shape[0]
+    min_dist = np.min(field, axis=0)
+    num_nearby = np.sum(field == min_dist, axis=0)
+    nearest = np.where(num_nearby == 2, -1, np.argmin(field, axis=0))
 
     edges = set()
     edges = edges.union(nearest[0])
@@ -41,44 +51,55 @@ def part1(field):
         if size > max_size:
             max_size = size
 
-    print(max_size)
+    return max_size
 
 
-def part2(field, dist_sum):
-    """ Solution to part 2 """
-    summed = np.sum(field, axis=2)
+def find_nearest_region(field, dist_sum):
+    """ Find largest region nearest to all coordinates """
+    summed = np.sum(field, axis=0)
     region = summed < dist_sum
-    print(np.sum(region))
+    return np.sum(region)
+
+
+def test_day6():
+    """ Test for day 6 """
+    size = 10
+    dist_sum = 32
+    lines = ["1, 1",
+             "1, 6",
+             "8, 3",
+             "3, 4",
+             "5, 5",
+             "8, 9"]
+
+    locations = [read_location(line) for line in lines]
+    field = build_field(size, locations)
+
+    expected = 17
+    actual = largest_finite_area(field)
+    assert actual == expected
+
+    expected = 16
+    actual = find_nearest_region(field, dist_sum)
+    assert actual == expected
 
 
 def day6():
     """ Solution to day 6 """
-    args = parse_args()
+    parse_args()
 
-    if args.debug:
-        size = 10
-        dist_sum = 32
-        lines = "1, 1\n1, 6\n8, 3\n3, 4\n5, 5\n8, 9".split('\n')
-    else:
-        size = 400
-        dist_sum = 10000
-        lines = read_input(6).split('\n')
+    size = 400
+    dist_sum = 10000
+    lines = read_input(6)
 
     locations = [read_location(line) for line in lines]
-    num_locations = len(locations)
-
-    print("Building field...")
-    field = np.zeros((size, size, num_locations), np.int32)
-    for i, (row, col) in enumerate(locations):
-        for rrow in range(size):
-            for ccol in range(size):
-                field[rrow, ccol, i] = np.abs(row-rrow) + np.abs(col-ccol)
+    field = build_field(size, locations)
 
     print("Part 1")
-    part1(field)
+    print(largest_finite_area(field))
 
     print("Part 2")
-    part2(field, dist_sum)
+    print(find_nearest_region(field, dist_sum))
 
 
 if __name__ == "__main__":
