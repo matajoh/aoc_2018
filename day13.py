@@ -1,6 +1,7 @@
 """ Solution to day 13 of the 2018 Advent of Code """
 
 from collections import deque
+import logging
 
 import numpy as np
 
@@ -258,68 +259,81 @@ def do_tick(carts, stop_on_collision):
     return None
 
 
-def part1(tracks, carts, verbose):
-    """ Solution to part 1 """
+def find_first_collision(tracks, carts):
+    """ Find the first collision """
     tick = 0
     carts.sort()
-    if verbose:
-        print("Start:", tick)
-        print(render_tracks(tracks, carts, None))
+    logging.debug("Start: %d", tick)
+    if logging.DEBUG >= logging.root.level:
+        logging.debug("%s", render_tracks(tracks, carts, None))
 
     while True:
         collision = do_tick(carts, True)
 
         tick += 1
 
-        if verbose:
-            print("Tick:", tick)
-            print(render_tracks(tracks, carts, collision))
+        logging.debug("Tick: %d", tick)
+        if logging.DEBUG >= logging.root.level:
+            logging.debug(render_tracks(tracks, carts, collision))
 
         if collision:
             break
 
-    print("Collision at: {},{}".format(collision[0], collision[1]))
+    return collision[0], collision[1]
 
 
-def part2(tracks, carts, verbose):
-    """ Solution to part 2 """
+def find_last_surviving_cart(tracks, carts):
+    """ Find the last surviving cart """
     tick = 0
     carts.sort()
-    if verbose:
-        print("Start:", tick)
-        print(render_tracks(tracks, carts, None))
+    logging.debug("Start: %d", tick)
+    if logging.DEBUG >= logging.root.level:
+        logging.debug(render_tracks(tracks, carts, None))
 
     while len(carts) > 1:
         do_tick(carts, False)
 
         tick += 1
 
-        if verbose:
-            print("Tick:", tick)
-            print(render_tracks(tracks, carts, None))
+        logging.debug("Tick: %d", tick)
+        if logging.DEBUG >= logging.root.level:
+            logging.debug(render_tracks(tracks, carts, None))
 
-    print("Final cart location: {},{}".format(carts[0].col, carts[0].row))
+    return carts[0].col, carts[0].row
 
+
+def test_day13():
+    """ Test for day 13 """
+
+    input_text = read_input(13, True, no_split=True)
+    tracks, carts = parse_input(input_text.split("\n"))
+    render = render_tracks(tracks, carts, None)
+    assert render == input_text
+
+    expected = (2, 0)
+    actual = find_first_collision(tracks, carts)
+    assert actual == expected
+
+    tracks, carts = parse_input(input_text.split("\n"))
+
+    expected = (6, 4)
+    actual = find_last_surviving_cart(tracks, carts)
+    assert actual == expected
 
 def day13():
     """ Solution to day 13 """
-    args = parse_args()
+    parse_args()
 
-    input_text = read_input(13, args.debug)
+    input_text = read_input(13, no_split=True)
     tracks, carts = parse_input(input_text.split("\n"))
-    render = render_tracks(tracks, carts, None)
-    assert render == input_text
 
     print("Part 1")
-    part1(tracks, carts, args.verbose)
+    print(find_first_collision(tracks, carts))
 
-    input_text = read_input(13, args.debug)
     tracks, carts = parse_input(input_text.split("\n"))
-    render = render_tracks(tracks, carts, None)
-    assert render == input_text
 
     print("Part 2")
-    part2(tracks, carts, args.verbose)
+    print(find_last_surviving_cart(tracks, carts))
 
 
 if __name__ == "__main__":
