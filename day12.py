@@ -5,20 +5,6 @@ import numpy as np
 from utils import parse_args, read_input
 
 
-def move(pot, count):
-    """ Move the pot by count """
-    if pot is None:
-        return None
-
-    if count < 0:
-        return move(pot.prev, count + 1)
-
-    if count > 0:
-        return move(pot.next, count - 1)
-
-    return pot
-
-
 class Rule:
     """ Class representing a growth rule """
 
@@ -41,9 +27,6 @@ class Rule:
         return "{} => {}".format(pattern, will_grow)
 
 
-NEIGHBORS = [-2, -1, 0, 1, 2]
-
-
 class Pot:
     """ Class representing a pot with a plant """
 
@@ -54,14 +37,28 @@ class Pot:
         self.neighbor_state = np.zeros(5, np.bool)
         self.next = next_pot
         self.prev = prev_pot
+        self._neighbors = None
 
     def _fill_neighbors(self):
-        neighbors = [move(self, distance) for distance in NEIGHBORS]
-        for i, neighbor in enumerate(neighbors):
-            if neighbor:
-                self.neighbor_state[i] = neighbor.has_plant
+        if self.prev is None:
+            self.neighbor_state[:2] = False
+        else:
+            self.neighbor_state[1] = self.prev.has_plant
+            if self.prev.prev is None:
+                self.neighbor_state[0] = False
             else:
-                self.neighbor_state[i] = False
+                self.neighbor_state[0] = self.prev.prev.has_plant
+
+        self.neighbor_state[2] = self.has_plant
+
+        if self.next is None:
+            self.neighbor_state[3:] = False
+        else:
+            self.neighbor_state[3] = self.next.has_plant
+            if self.next.next is None:
+                self.neighbor_state[4] = False
+            else:
+                self.neighbor_state[4] = self.next.next.has_plant
 
     def apply_rule(self, rule):
         """ Apply this rule to the pot """
@@ -172,7 +169,7 @@ def grow_plants(generations, first_pot, rules, verbose):
 def day12():
     """ Solution to day 12 """
     args = parse_args()
-    lines = read_input(12, args.debug).split('\n')
+    lines = read_input(12, args.debug)
 
     first_pot, rules = parse_input(lines)
     print("Part 1")
