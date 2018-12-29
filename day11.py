@@ -1,131 +1,137 @@
 """ Solution to day 11 of the 2018 Advent of Code """
 
+import logging
+
 import numpy as np
+import pytest
 
 from utils import parse_args
 
-DEBUG_CELLS = [
-    (122, 79, 57, -5),
-    (217, 196, 39, 0),
-    (101, 153, 71, 4)
-]
-
-DEBUG_PART1_GRIDS = [
+TEST_PART1_GRIDS = [
     (18, 33, 45, 29),
     (42, 21, 61, 30)
 ]
 
-DEBUG_PART2_GRIDS = [
+TEST_PART2_GRIDS = [
     (18, 90, 269, 16, 113),
     (42, 232, 251, 12, 119)
 ]
 
 
-def compute_cell_power_level(x, y, serial_number):
-    """ Compute the power level of a cell """
-    rack_id = x + 10
-    power_level = rack_id * y
-    power_level += serial_number
-    power_level *= rack_id
-    power_level //= 100
-    power_level %= 100
-    power_level %= 10
-    return power_level - 5
+class IntegralImage:
+    """ Implements an integral image (or Summed Area Table) """
 
+    def __init__(self, image):
+        rows, cols = image.shape
+        self._values = np.zeros((rows+1, cols+1), np.int64)
+        for row in range(rows):
+            row_sum = 0
+            for col in range(cols):
+                row_sum += image[row, col]
+                above = self._values[row, col+1]
+                self._values[row+1, col+1] = row_sum + above
 
-def find_max_region(grid, region_size, verbose):
-    """ Find the region with the maximum power level. """
+    def find_max_region(self, size):
+        """ Finds the maximum region of the specified size """
+        rows, cols = self.shape
+        region_sums = np.zeros((rows-size, cols-size), np.int64)
+        region_sums += self._values[size:, size:]
+        region_sums -= self._values[size:, :cols-size]
+        region_sums -= self._values[:rows-size, size:]
+        region_sums += self._values[:rows-size, :cols-size]
+        max_region = np.argmax(region_sums)
+        max_region = np.unravel_index(max_region, region_sums.shape)
+        max_sum = region_sums[max_region]
 
-    grid_size = grid.shape[0]
-    max_sum = region_size*region_size*-5
-    max_region = None
-    for x in range(grid_size - region_size + 1):
-        for y in range(grid_size - region_size + 1):
-            region = grid[y:y+region_size, x:x+region_size]
-            if region.sum() > max_sum:
-                max_sum = region.sum()
-                max_region = (x, y)
+        logging.debug("%d %s %d", size, max_region, max_sum)
 
-    if verbose:
-        print(region_size, max_region, max_sum)
+        return max_region, max_sum
 
-    return max_region
+    @property
+    def shape(self):
+        """ The shape of the integral image """
+        return self._values.shape
 
 
 def build_grid(serial_number, grid_size):
     """ Build a grid using the provided serial number and size """
 
+    values = np.arange(grid_size*grid_size,
+                       dtype=np.int32).reshape(grid_size, grid_size)
+    x_values = values % grid_size
+    y_values = values // grid_size
     grid = np.zeros((grid_size, grid_size), np.int32)
-    for x in range(grid_size):
-        for y in range(grid_size):
-            grid[y, x] = compute_cell_power_level(x, y, serial_number)
-
+    rack_id = x_values + 10
+    grid = rack_id * y_values
+    grid += serial_number
+    grid *= rack_id
+    grid //= 100
+    grid %= 100
+    grid %= 10
+    grid -= 5
     return grid
 
 
-def part1(serial_number, grid_size, verbose):
+def part1(serial_number, grid_size):
     """ Solution to part 1 """
 
     grid = build_grid(serial_number, grid_size)
+    integral_image = IntegralImage(grid)
 
-    x, y = find_max_region(grid, 3, verbose)
-    region = grid[y:y+3, x:x+3]
+    (y, x), region_sum = integral_image.find_max_region(3)
 
-    if verbose:
-        print(grid[y-1:y+4, x-1:x+4])
+    logging.debug("%s", grid[y-1:y+4, x-1:x+4])
 
-    return x, y, region.sum()
+    return x, y, region_sum
 
 
-def part2(serial_number, grid_size, max_region_size, verbose):
+def part2(serial_number, grid_size, max_region_size):
     """ Solution to part 2 """
     grid = build_grid(serial_number, grid_size)
+    integral_image = IntegralImage(grid)
 
     max_region = None
     max_sum = max_region_size*max_region_size*-5
     for region_size in range(1, max_region_size):
-        x, y = find_max_region(grid, region_size, verbose)
-        region = grid[y:y+region_size, x:x+region_size]
-        if region.sum() > max_sum:
-            max_sum = region.sum()
+        (y, x), region_sum = integral_image.find_max_region(region_size)
+        if region_sum > max_sum:
+            max_sum = region_sum
             max_region = x, y, region_size
 
     x, y, region_size = max_region
     return x, y, region_size, max_sum
 
 
+@pytest.mark.parametrize("serial_number, exp_x, exp_y, exp_sum", TEST_PART1_GRIDS)
+def test_part1(serial_number, exp_x, exp_y, exp_sum):
+    """ Tests for part 1 """
+    act_x, act_y, act_sum = part1(serial_number, 300)
+    assert act_x == exp_x
+    assert act_y == exp_y
+    assert act_sum == exp_sum
+
+
+@pytest.mark.parametrize("serial_number, exp_x, exp_y, exp_size, exp_sum", TEST_PART2_GRIDS)
+def test_part2(serial_number, exp_x, exp_y, exp_size, exp_sum):
+    """ Tests for part 2 """
+    act_x, act_y, act_size, act_sum = part2(serial_number, 300, 30)
+    assert act_x == exp_x
+    assert act_y == exp_y
+    assert act_size == exp_size
+    assert act_sum == exp_sum
+
+
 def day11():
     """ Solution to day 11 """
-    args = parse_args()
+    parse_args()
 
-    if args.debug:
-        for x, y, serial_number, expected in DEBUG_CELLS:
-            actual = compute_cell_power_level(x, y, serial_number)
-            assert actual == expected
+    x, y, _ = part1(3031, 300)
+    print("Part 1")
+    print("{},{}".format(x, y))
 
-        for test_case in DEBUG_PART1_GRIDS:
-            serial_number, exp_x, exp_y, exp_sum = test_case
-            act_x, act_y, act_sum = part1(serial_number, 300, args.verbose)
-            assert act_x == exp_x
-            assert act_y == exp_y
-            assert act_sum == exp_sum
-
-        for test_case in DEBUG_PART2_GRIDS:
-            serial_number, exp_x, exp_y, exp_size, exp_sum = test_case
-            act_x, act_y, act_size, act_sum = part2(serial_number, 300,
-                                                    30, args.verbose)
-            assert act_x == exp_x
-            assert act_y == exp_y
-            assert act_size == exp_size
-            assert act_sum == exp_sum
-    else:
-        x, y, _ = part1(3031, 300, args.verbose)
-        print("Part 1")
-        print("{},{}".format(x, y))
-
-        x, y, region_size, _ = part2(3031, 300, 30, args.verbose)
-        print("Part 2")
-        print("{},{},{}".format(x, y, region_size))
+    x, y, region_size, _ = part2(3031, 300, 30)
+    print("Part 2")
+    print("{},{},{}".format(x, y, region_size))
 
 
 if __name__ == "__main__":
