@@ -5,7 +5,7 @@ from collections import deque
 
 import numpy as np
 
-from utils import read_input, parse_args, VideoBuilder, AStarSearch, diff
+from utils import read_input, parse_args, ASCIIVideoBuilder, AStarSearch, diff
 
 PART1_TEST_OUTCOMES = [
     27730,
@@ -207,7 +207,7 @@ class Battle:
                     spec, self, index, attack=attack_power)
 
         if build_video:
-            self._builder = VideoBuilder("day15.mp4", self._walls, COLOR_MAP)
+            self._builder = ASCIIVideoBuilder("day15.mp4", self._walls, COLOR_MAP)
             self._state = np.zeros_like(self._walls, np.uint8)
         else:
             self._builder = None
@@ -324,7 +324,7 @@ class Battle:
             if unit is None or not unit.is_alive:
                 continue
 
-            if self._state:
+            if self._builder:
                 self._state[unit.index] = unit.race
 
             if unit.take_turn():

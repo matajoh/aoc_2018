@@ -60,12 +60,12 @@ VIDEO_DIR = "videos"
 class VideoBuilder:
     """ Build a video from colorized frame images """
 
-    def __init__(self, path, sample_state, color_map, frame_rate=24):
+    def __init__(self, path, sample_state, color_map, frame_rate=24, no_resize=False):
         if not os.path.exists(VIDEO_DIR):
             os.makedirs(VIDEO_DIR)
 
         height, width = sample_state.shape
-        if max(height, width) < 400:
+        if max(height, width) < 400 and not no_resize:
             if height > width:
                 self._height = 400
                 self._width = (400*width)//height
@@ -128,7 +128,7 @@ class ASCIIVideoBuilder(VideoBuilder):
         rows *= self._glyph_rows
         cols *= self._glyph_cols
         self._glyph_state = np.zeros((rows, cols), np.uint8)
-        super().__init__(path, self._glyph_state, color_map, frame_rate)
+        super().__init__(path, self._glyph_state, color_map, frame_rate, True)
 
     def add_frame(self, state):
         rows, cols = state.shape
