@@ -1,31 +1,26 @@
 """ Solution to day 14 of 2018 Advent of Code """
 
 from copy import copy
+import logging
+
+import pytest
 
 from utils import parse_args
 
 SCORES = [3, 7]
 
-DEBUG_PART1 = [
+PART1_TESTS = [
     (9, "5158916779"),
     (5, "0124515891"),
     (18, "9251071085"),
     (2018, "5941429882")
 ]
 
-DEBUG_PART2 = [
+PART2_TESTS = [
     ("51589", 9),
     ("01245", 5),
     ("92510", 18),
     ("59414", 2018)
-]
-
-TEST_PART1 = [
-    (409551, None)
-]
-
-TEST_PART2 = [
-    ("409551", None)
 ]
 
 
@@ -42,15 +37,15 @@ def print_scoreboard(scores, elf0, elf1):
 
         parts.append(text)
 
-    print("".join(parts))
+    logging.debug("".join(parts))
 
 
-def grow_to_length(scores, length, verbose):
+def grow_to_length(scores, length):
     """ Grow the scoreboard to the desired length """
     elf0 = 0
     elf1 = 1
     while len(scores) < length:
-        if verbose:
+        if logging.DEBUG >= logging.root.level:
             print_scoreboard(scores, elf0, elf1)
 
         recipe = scores[elf0] + scores[elf1]
@@ -66,9 +61,9 @@ def grow_to_length(scores, length, verbose):
     return elf0, elf1
 
 
-def part1(scores, start, verbose):
+def part1(scores, start):
     """ Solution to part 1 """
-    grow_to_length(scores, start+10, verbose)
+    grow_to_length(scores, start+10)
     parts = [str(score) for score in scores[start:start + 10]]
     return "".join(parts)
 
@@ -87,46 +82,61 @@ def part2(scores, sequence_text):
     """ Solution to part 2 """
     sequence = [int(char) for char in sequence_text]
 
-    elf0, elf1 = grow_to_length(scores, len(sequence), False)
+    elf0, elf1 = grow_to_length(scores, len(sequence))
+    assert sequence[-1] == 1
+    check_prev = sequence[-2]
 
+    prev = None
     while True:
         if len(scores) % 100000 == 0:
-            print(len(scores))
+            logging.debug(len(scores))
 
         recipe = scores[elf0] + scores[elf1]
 
         if recipe // 10:
             scores.append(1)
+            if prev == check_prev:
+                if check_for_match(scores, sequence):
+                    break
+
+            prev = 1
+
+        curr = recipe % 10
+        scores.append(curr)
+        if curr == 1 and prev == check_prev:
             if check_for_match(scores, sequence):
                 break
 
-        scores.append(recipe % 10)
-        if check_for_match(scores, sequence):
-            break
-
+        prev = curr
         elf0 = (elf0 + 1 + scores[elf0]) % len(scores)
         elf1 = (elf1 + 1 + scores[elf1]) % len(scores)
 
     return len(scores) - len(sequence)
 
+@pytest.mark.parametrize("start, expected", PART1_TESTS)
+def test_part1(start, expected):
+    """ Test for part 1 """
+    scores = copy(SCORES)
+    actual = part1(scores, start)
+    assert actual == expected
+
+@pytest.mark.parametrize("sequence, expected", PART2_TESTS)
+def test_part2(sequence, expected):
+    """ Test for part 2 """
+    scores = copy(SCORES)
+    actual = part2(scores, sequence)
+    assert actual == expected
+
 
 def day14():
     """ Solution to day 14 """
-    args = parse_args()
-    cases = DEBUG_PART1 if args.debug else TEST_PART1
+    parse_args()
 
     print("Part 1")
-    for start, expected in cases:
-        scores = copy(SCORES)
-        actual = part1(scores, start, args.verbose)
-        print(start, ":", actual, "(", expected, ")")
+    print(part1(copy(SCORES), 409551))
 
-    cases = DEBUG_PART2 if args.debug else TEST_PART2
     print("Part 2")
-    for sequence, expected in cases:
-        scores = copy(SCORES)
-        actual = part2(scores, sequence)
-        print(sequence, ":", actual, "(", expected, ")")
+    print(part2(copy(SCORES), "409551"))
 
 
 if __name__ == "__main__":
