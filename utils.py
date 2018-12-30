@@ -8,7 +8,7 @@ import heapq
 from collections import deque
 from subprocess import Popen, PIPE, STDOUT
 
-from PIL import Image, ImagePalette
+from PIL import Image, ImagePalette, ImageDraw, ImageFont
 import numpy as np
 
 PATH_TEMPLATE = "day{}_{}input.txt"
@@ -60,11 +60,11 @@ VIDEO_DIR = "videos"
 class VideoBuilder:
     """ Build a video from colorized frame images """
 
-    def __init__(self, path, sample_frame, color_map, frame_rate=24):
+    def __init__(self, path, sample_state, color_map, frame_rate=24):
         if not os.path.exists(VIDEO_DIR):
             os.makedirs(VIDEO_DIR)
 
-        height, width = sample_frame.shape
+        height, width = sample_state.shape
         if max(height, width) < 400:
             if height > width:
                 self._height = 400
@@ -108,6 +108,40 @@ class VideoBuilder:
         """ Close the video """
         self._ffmpeg.stdin.close()
         self._ffmpeg.wait()
+
+
+class ASCIIVideoBuilder(VideoBuilder):
+    """ Video Builder which uses ASCII characters instead of pixels """
+
+    def __init__(self, path, sample_state, color_map, frame_rate=24):
+        font = ImageFont.load_default()
+        size = font.getsize("a")
+        self._glyph_cols, self._glyph_rows = size
+        self._glyphs = {}
+        for code in color_map:
+            image = Image.new('L', size)
+            draw = ImageDraw.Draw(image)
+            draw.text((0, 0), chr(code), fill=code, font=font)
+            self._glyphs[code] = np.array(image)
+
+        rows, cols = sample_state.shape
+        rows *= self._glyph_rows
+        cols *= self._glyph_cols
+        self._glyph_state = np.zeros((rows, cols), np.uint8)
+        super().__init__(path, self._glyph_state, color_map, frame_rate)
+
+    def add_frame(self, state):
+        rows, cols = state.shape
+        for row in range(rows):
+            top = row * self._glyph_rows
+            bottom = top + self._glyph_rows
+            for col in range(cols):
+                left = col * self._glyph_cols
+                right = left + self._glyph_cols
+                glyph = self._glyphs[state[row, col]]
+                self._glyph_state[top:bottom, left:right] = glyph
+
+        super().add_frame(self._glyph_state)
 
 
 class Point:

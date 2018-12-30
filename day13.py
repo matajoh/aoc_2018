@@ -5,7 +5,7 @@ import logging
 
 import numpy as np
 
-from utils import read_input, parse_args
+from utils import read_input, parse_args, ASCIIVideoBuilder
 
 
 NORTH_SOUTH = ord('|')
@@ -16,6 +16,26 @@ NW_CURVE = ord('\\')
 SE_CURVE = ord('\\') + 1000
 INTERSECTION = ord('+')
 EMPTY = ord(' ')
+NORTH = ord('^')
+EAST = ord('>')
+SOUTH = ord('v')
+WEST = ord('<')
+COLLISION = ord('X')
+
+
+COLOR_MAP = {
+    EMPTY: (0, 0, 0),
+    NORTH_SOUTH: (0, 255, 0),
+    EAST_WEST: (0, 255, 0),
+    NE_CURVE: (0, 255, 0),
+    NW_CURVE: (0, 255, 0),
+    INTERSECTION: (0, 255, 0),
+    NORTH: (255, 255, 255),
+    EAST: (255, 255, 255),
+    SOUTH: (255, 255, 255),
+    WEST: (255, 255, 255),
+    COLLISION: (255, 0, 0),
+}
 
 
 def print_connections(connections):
@@ -56,11 +76,6 @@ class Track:
     def __repr__(self):
         return chr(self.type % 1000)
 
-
-NORTH = ord('^')
-EAST = ord('>')
-SOUTH = ord('v')
-WEST = ord('<')
 
 # left, straight, right
 TURNS = [
@@ -205,6 +220,20 @@ def parse_input(lines):
     return tracks, carts
 
 
+def update_state(state, tracks, carts, collision):
+    """ Update the state of the simulation """
+    rows, cols = tracks.shape
+    for row in range(rows):
+        for col in range(cols):
+            state[row, col] = tracks[row, col].type % 1000
+
+    for cart in carts:
+        state[cart.row, cart.col] = cart.direction
+
+    if collision:
+        state[collision[1], collision[0]] = ord('X')
+
+
 def render_tracks(tracks, carts, collision):
     """ Renders the tracks and carts in ASCII """
     lines = []
@@ -259,8 +288,18 @@ def do_tick(carts, stop_on_collision):
     return None
 
 
-def find_first_collision(tracks, carts):
+def find_first_collision(tracks, carts, build_video):
     """ Find the first collision """
+
+    if build_video:
+        state = np.zeros(tracks.shape, np.uint8)
+        builder = ASCIIVideoBuilder("day13.mp4", state, COLOR_MAP)
+        update_state(state, tracks, carts, None)
+        builder.add_frame(state)
+    else:
+        builder = None
+        state = None
+
     tick = 0
     carts.sort()
     logging.debug("Start: %d", tick)
@@ -276,8 +315,15 @@ def find_first_collision(tracks, carts):
         if logging.DEBUG >= logging.root.level:
             logging.debug(render_tracks(tracks, carts, collision))
 
+        if builder:
+            update_state(state, tracks, carts, collision)
+            builder.add_frame(state)
+
         if collision:
             break
+
+    if builder:
+        builder.close()
 
     return collision[0], collision[1]
 
@@ -311,7 +357,7 @@ def test_day13():
     assert render == input_text
 
     expected = (2, 0)
-    actual = find_first_collision(tracks, carts)
+    actual = find_first_collision(tracks, carts, False)
     assert actual == expected
 
     tracks, carts = parse_input(input_text.split("\n"))
@@ -320,15 +366,16 @@ def test_day13():
     actual = find_last_surviving_cart(tracks, carts)
     assert actual == expected
 
+
 def day13():
     """ Solution to day 13 """
-    parse_args()
+    args = parse_args()
 
     input_text = read_input(13, no_split=True)
     tracks, carts = parse_input(input_text.split("\n"))
 
     print("Part 1")
-    print(find_first_collision(tracks, carts))
+    print(find_first_collision(tracks, carts, args.video))
 
     tracks, carts = parse_input(input_text.split("\n"))
 
