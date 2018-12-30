@@ -1,12 +1,11 @@
 """ Solution to day 16 of the 2018 Advent of Code """
 
+import logging
 from collections import deque
 
-from utils import read_input, parse_args
+import pytest
 
-DEBUG_PART1 = ["Before: [3, 2, 1, 1]",
-               "9 2 1 2",
-               "After:  [3, 2, 2, 1]"]
+from utils import read_input, parse_args
 
 
 def assign(registers, index, value):
@@ -172,6 +171,31 @@ def eqrr(registers, instruction):
     return assign(registers, C, value)
 
 
+OP_TESTS = [
+    (addr, (None, 0, 1, 3), (3, 5, 7, 11), (3, 5, 7, 8)),
+    (addi, (None, 3, 2, 1), (3, 5, 7, 11), (3, 13, 7, 11)),
+
+    (mulr, (None, 0, 1, 3), (3, 5, 7, 11), (3, 5, 7, 15)),
+    (muli, (None, 3, 2, 1), (3, 5, 7, 11), (3, 22, 7, 11)),
+
+    (banr, (None, 0, 1, 3), (3, 5, 7, 11), (3, 5, 7, 1)),
+    (bani, (None, 3, 2, 1), (3, 5, 7, 11), (3, 2, 7, 11)),
+
+    (borr, (None, 0, 1, 3), (3, 5, 7, 11), (3, 5, 7, 7)),
+    (bori, (None, 3, 2, 1), (3, 5, 7, 11), (3, 11, 7, 11)),
+
+    (setr, (None, 0, 1, 3), (3, 5, 7, 11), (3, 5, 7, 3)),
+    (seti, (None, 3, 2, 1), (3, 5, 7, 11), (3, 3, 7, 11)),
+
+    (gtir, (None, 0, 1, 3), (3, 5, 7, 11), (3, 5, 7, 0)),
+    (gtri, (None, 3, 1, 2), (3, 5, 7, 11), (3, 5, 1, 11)),
+    (gtrr, (None, 2, 1, 0), (3, 5, 7, 11), (1, 5, 7, 11)),
+
+    (eqir, (None, 0, 1, 3), (3, 5, 7, 11), (3, 5, 7, 0)),
+    (eqri, (None, 3, 11, 2), (3, 5, 7, 11), (3, 5, 1, 11)),
+    (eqrr, (None, 2, 1, 0), (3, 5, 7, 11), (0, 5, 7, 11)),
+]
+
 OPS = {
     "addr": addr,
     "addi": addi,
@@ -192,35 +216,10 @@ OPS = {
 }
 
 
-def test(operation, instructions, registers, expected):
+@pytest.mark.parametrize("operation, instructions, registers, expected", OP_TESTS)
+def test_operation(operation, instructions, registers, expected):
     """ Operation test """
     assert operation(registers, instructions) == expected
-
-
-def test_operations():
-    """ Tests that all the operations work as expected """
-    test(addr, (None, 0, 1, 3), (3, 5, 7, 11), (3, 5, 7, 8))
-    test(addi, (None, 3, 2, 1), (3, 5, 7, 11), (3, 13, 7, 11))
-
-    test(mulr, (None, 0, 1, 3), (3, 5, 7, 11), (3, 5, 7, 15))
-    test(muli, (None, 3, 2, 1), (3, 5, 7, 11), (3, 22, 7, 11))
-
-    test(banr, (None, 0, 1, 3), (3, 5, 7, 11), (3, 5, 7, 1))
-    test(bani, (None, 3, 2, 1), (3, 5, 7, 11), (3, 2, 7, 11))
-
-    test(borr, (None, 0, 1, 3), (3, 5, 7, 11), (3, 5, 7, 7))
-    test(bori, (None, 3, 2, 1), (3, 5, 7, 11), (3, 11, 7, 11))
-
-    test(setr, (None, 0, 1, 3), (3, 5, 7, 11), (3, 5, 7, 3))
-    test(seti, (None, 3, 2, 1), (3, 5, 7, 11), (3, 3, 7, 11))
-
-    test(gtir, (None, 0, 1, 3), (3, 5, 7, 11), (3, 5, 7, 0))
-    test(gtri, (None, 3, 1, 2), (3, 5, 7, 11), (3, 5, 1, 11))
-    test(gtrr, (None, 2, 1, 0), (3, 5, 7, 11), (1, 5, 7, 11))
-
-    test(eqir, (None, 0, 1, 3), (3, 5, 7, 11), (3, 5, 7, 0))
-    test(eqri, (None, 3, 11, 2), (3, 5, 7, 11), (3, 5, 1, 11))
-    test(eqrr, (None, 2, 1, 0), (3, 5, 7, 11), (0, 5, 7, 11))
 
 
 def read_registers(line):
@@ -248,38 +247,36 @@ class Sample:
         self.instruction = read_instruction(lines[1])
         self.after = read_registers(lines[2][7:])
 
-    def find_matching_ops(self, verbose):
+    def find_matching_ops(self):
         """ Find all operations that match this sample """
         matches = []
         for code in OPS:
             if OPS[code](self.before, self.instruction) == self.after:
-                if verbose:
-                    print(code)
-
+                logging.debug(code)
                 matches.append(code)
 
         return matches
 
 
-def part1(samples, verbose):
+def part1(samples):
     """ Solution to part 1 """
     num_matches = 0
     for sample in samples:
-        matches = sample.find_matching_ops(verbose)
+        matches = sample.find_matching_ops()
         if len(matches) >= 3:
             num_matches += 1
 
     return num_matches
 
 
-def determine_op_codes(samples, verbose):
+def determine_op_codes(samples):
     """ Determine the correct sequence of op codes using the samples """
     op_indices = {}
     for code in OPS:
         op_indices[code] = set()
 
     for sample in samples:
-        matches = sample.find_matching_ops(verbose)
+        matches = sample.find_matching_ops()
         for match in matches:
             op_indices[match].add(sample.instruction[0])
 
@@ -298,22 +295,20 @@ def determine_op_codes(samples, verbose):
                 if index in op_indices[other_code]:
                     op_indices[other_code].remove(index)
 
-        if verbose:
-            print(op_lookup, op_indices)
+        logging.debug("%s %s", op_lookup, op_indices)
 
     op_codes = [""] * len(OPS)
     for code in op_lookup:
         op_codes[op_lookup[code]] = code
 
-    if verbose:
-        print(op_codes)
+    logging.debug(op_codes)
 
     return op_codes
 
 
-def part2(samples, program, verbose):
+def part2(samples, program):
     """ Solution to part 2 """
-    op_codes = determine_op_codes(samples, verbose)
+    op_codes = determine_op_codes(samples)
     registers = (0, 0, 0, 0)
     for instruction in program:
         op_code = op_codes[instruction[0]]
@@ -324,17 +319,10 @@ def part2(samples, program, verbose):
 
 def day16():
     """ Solution to day 16 """
-    args = parse_args()
-
-    if args.debug:
-        test_operations()
-        sample = Sample(DEBUG_PART1, 0)
-        matches = sample.find_matching_ops(args.verbose)
-        assert len(matches) == 3
-        return
+    parse_args()
 
     samples = []
-    lines = deque(read_input(16).split('\n'))
+    lines = deque(read_input(16))
     index = 0
     while lines[0].startswith("Before:"):
         sample = Sample([
@@ -349,14 +337,14 @@ def day16():
         samples.append(sample)
 
     print("Part 1")
-    print(part1(samples, args.verbose))
+    print(part1(samples))
 
     lines.popleft()
     lines.popleft()
     program = [read_instruction(line) for line in lines]
 
     print("Part 2")
-    print(part2(samples, program, args.verbose))
+    print(part2(samples, program))
 
 
 if __name__ == "__main__":
