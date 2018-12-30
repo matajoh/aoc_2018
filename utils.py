@@ -243,40 +243,26 @@ class AStarSearch:
 
         return total_path
 
-    def find_shortest_path(self, start, goal, verbose=False):
+    def find_shortest_path(self, start, goal):
         """ Find the shortest path from the start to the goal """
         closed_set = set()
-        open_set = set([start])
+        open_set = PriorityQueue()
+        open_set.add(start, self._heuristic(start, goal))
         came_from = {}
         g_scores = {}
         g_scores[start] = 0
-        f_scores = {}
-        f_scores[start] = self._heuristic(start, goal)
         iteration = 0
         while open_set:
-            current = None
-            f_score = None
-            for point in open_set:
-                if f_score is None:
-                    f_score = f_scores[point]
-                    current = point
-                elif f_scores[point] < f_score:
-                    f_score = f_scores[point]
-                    current = point
+            f_score, current = open_set.pop()
 
-            if verbose:
-                iteration += 1
-                if iteration % 100 == 0:
-                    print(iteration, ":",
-                          "|open_set| =",
-                          len(open_set),
-                          "current f score:",
-                          f_score)
+            iteration += 1
+            if iteration % 100 == 0:
+                logging.debug("%d: |open_set|=%d current f score: %d",
+                              iteration, len(open_set), f_score)
 
             if current == goal:
                 return AStarSearch._reconstruct_path(came_from, current)
 
-            open_set.remove(current)
             closed_set.add(current)
 
             for neighbor in self._graph.neighbors(current):
@@ -285,15 +271,15 @@ class AStarSearch:
 
                 tentative_g_score = g_scores[current]
                 tentative_g_score += self._distance_between(current, neighbor)
-                if neighbor not in open_set:
-                    open_set.add(neighbor)
-                elif tentative_g_score >= g_scores[neighbor]:
-                    continue
+                if neighbor in open_set:
+                    if tentative_g_score >= g_scores[neighbor]:
+                        continue
 
                 came_from[neighbor] = current
                 g_scores[neighbor] = tentative_g_score
-                f_scores[neighbor] = g_scores[neighbor]
-                f_scores[neighbor] += self._heuristic(neighbor, goal)
+
+                f_score = g_scores[neighbor] + self._heuristic(neighbor, goal)
+                open_set.add(neighbor, f_score)
 
         return None
 
@@ -386,6 +372,9 @@ class PriorityQueue:
 
     def __len__(self):
         return len(self._entries)
+
+    def __contains__(self, value):
+        return value in self._entry_finder
 
     def add(self, value, priority=0):
         """ Add a new value or update the priority of an existing value """

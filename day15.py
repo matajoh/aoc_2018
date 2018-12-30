@@ -1,12 +1,13 @@
 """ Solution to day 15 of the 2018 Advent of Code """
 
+import logging
 from collections import deque
 
 import numpy as np
 
 from utils import read_input, parse_args, VideoBuilder, AStarSearch, diff
 
-DEBUG_PART1_OUTCOMES = [
+PART1_TEST_OUTCOMES = [
     27730,
     36334,
     39514,
@@ -15,9 +16,9 @@ DEBUG_PART1_OUTCOMES = [
     18740
 ]
 
-DEBUG_PART2_OUTCOMES = [
+PART2_TEST_OUTCOMES = [
     (15, 4988),
-    (0, None),
+    (4, 29064),
     (4, 31284),
     (15, 3478),
     (12, 6474),
@@ -232,7 +233,7 @@ class Battle:
                 lines.append("{}   {}".format(field_text, unit_text).strip())
 
         return "\n".join(lines)
-    
+
     def neighbors(self, position):
         """ Returns the valid neighbors for a position """
         for neighbor in neighbors(position):
@@ -241,7 +242,7 @@ class Battle:
 
             if self._units[neighbor]:
                 continue
-            
+
             yield neighbor
 
     @property
@@ -384,55 +385,53 @@ def read_end_state(lines):
     return "\n".join(end_lines)
 
 
-def run_battle(battle, verbose):
+def run_battle(battle):
     """ Runs a battle to completion """
-    if verbose:
-        print("Round", battle.num_rounds)
-        print(battle)
+    logging.debug("Round %d", battle.num_rounds)
+    logging.debug("%s", battle)
 
     while not battle.round():
-        if verbose:
-            print("Round", battle.num_rounds)
-            print(battle)
+        logging.debug("Round %d", battle.num_rounds)
+        logging.debug("%s", battle)
 
-    if verbose:
-        print("Final")
-        print(battle)
+    logging.debug("Final")
+    logging.debug("%s", battle)
 
 
-def part1(debug, verbose, build_video):
-    """ Solution to part 1 """
-    if debug:
-        lines = read_input(15, True)
-        lines = deque(lines.split('\n'))
-        outcomes0 = DEBUG_PART1_OUTCOMES
-    else:
-        lines = read_input(15)
-        lines = deque(lines.split('\n'))
-        outcomes0 = [None]
+def determine_outcome(build_video):
+    """ Determine the outcome of the battle """
+    lines = deque(read_input(15))
+
+    expected = read_start_state(lines)
+    battle = Battle(expected.split('\n'), build_video=build_video)
+    assert battle.to_string(True) == expected
+
+    run_battle(battle)
+
+    _, hp_sum = battle.winners
+    return hp_sum * battle.num_rounds
+
+
+def test_part1():
+    """ Test for part 1 """
+    lines = read_input(15, True)
+    lines = deque(lines)
+    outcomes0 = PART1_TEST_OUTCOMES
 
     case = 0
     while lines:
         expected = read_start_state(lines)
-        battle = Battle(expected.split('\n'), build_video=build_video)
+        battle = Battle(expected.split('\n'), build_video=False)
         assert battle.to_string(True) == expected
 
-        if lines:
-            expected = read_end_state(lines)
-        else:
-            expected = None
+        expected = read_end_state(lines)
+        run_battle(battle)
+        assert str(battle) == expected, diff(str(battle), expected)
 
-        run_battle(battle, verbose)
+        _, hp_sum = battle.winners
+        actual = hp_sum * battle.num_rounds
+        assert actual == outcomes0[case]
 
-        if expected:
-            assert str(battle) == expected, diff(str(battle), expected)
-
-        race, hp_sum = battle.winners
-        print("Combat ends after", battle.num_rounds, "full rounds")
-        print(race, "win with", hp_sum, "total hit points left")
-        print("Outcome:", battle.num_rounds, "*",
-              hp_sum, "=", hp_sum*battle.num_rounds)
-        print("( Expected:", outcomes0[case], ")")
         case += 1
 
 
@@ -440,22 +439,35 @@ def try_attack_power(expected, attack_power):
     """ Try the provided attack power """
     battle = Battle(expected.split('\n'), attack_power, True)
     try:
-        run_battle(battle, False)
+        run_battle(battle)
         return battle
     except ElfException:
         return None
 
 
-def part2(debug, verbose):
-    """ Solution to part 2"""
-    if debug:
-        lines = read_input(15, True)
-        lines = deque(lines.split('\n'))
-        outcomes1 = DEBUG_PART2_OUTCOMES
-    else:
-        lines = read_input(15)
-        lines = deque(lines.split('\n'))
-        outcomes1 = [(0, None)]
+def find_attack_power():
+    """ Find an attack power so that the elves win """
+    lines = deque(read_input(15))
+
+    expected = read_start_state(lines)
+    attack_power = 4
+    while True:
+        battle = try_attack_power(expected, attack_power)
+        if battle is None:
+            logging.debug("%d failed, trying %d",
+                          attack_power, attack_power + 1)
+
+            attack_power += 1
+            continue
+
+        _, hp_sum = battle.winners
+        return hp_sum * battle.num_rounds
+
+
+def test_part2():
+    """ Test for part 2"""
+    lines = deque(read_input(15, True))
+    outcomes1 = PART2_TEST_OUTCOMES
 
     case = 0
     while lines:
@@ -466,20 +478,17 @@ def part2(debug, verbose):
         while True:
             battle = try_attack_power(expected, attack_power)
             if battle is None:
-                if verbose:
-                    print(attack_power, "failed, trying", attack_power + 1)
+                logging.debug("%d failed, trying %d",
+                              attack_power, attack_power + 1)
 
                 attack_power += 1
                 continue
 
-            race, hp_sum = battle.winners
+            _, hp_sum = battle.winners
             expected_ap, expected = outcomes1[case]
-            print("Attack Power =", attack_power)
-            print("Combat ends after", battle.num_rounds, "full rounds")
-            print(race, "win with", hp_sum, "total hit points left")
-            print("Outcome:", battle.num_rounds, "*",
-                  hp_sum, "=", hp_sum*battle.num_rounds)
-            print("( Expected:", expected_ap, "AP", expected, ")")
+            actual = hp_sum * battle.num_rounds
+            assert attack_power == expected_ap
+            assert actual == expected
             break
 
         case += 1
@@ -490,13 +499,13 @@ def day15():
     args = parse_args()
 
     print("Part 1")
-    part1(args.debug, args.verbose, args.video)
+    print(determine_outcome(args.video))
 
     if args.video:
         return
 
-    print("\n\nPart 2")
-    part2(args.debug, args.verbose)
+    print("Part 2")
+    print(find_attack_power())
 
 
 if __name__ == "__main__":
