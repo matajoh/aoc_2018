@@ -29,14 +29,18 @@ class Sample:
 
         self.index = index
         self.before = read_registers(lines[0][8:])
-        self.instruction = read_instruction(lines[1])
+        spec = read_instruction(lines[1])
+        self.index = spec[0]
+        self.args = spec[1:]
         self.after = read_registers(lines[2][7:])
 
     def find_matching_ops(self):
         """ Find all operations that match this sample """
         matches = []
         for code in OPS:
-            if OPS[code](self.before, self.instruction) == self.after:
+            registers = list(self.before)
+            registers = tuple(OPS[code](registers, self.args))
+            if registers == self.after:
                 logging.debug(code)
                 matches.append(code)
 
@@ -63,7 +67,7 @@ def determine_op_codes(samples):
     for sample in samples:
         matches = sample.find_matching_ops()
         for match in matches:
-            op_indices[match].add(sample.instruction[0])
+            op_indices[match].add(sample.index)
 
     op_lookup = {}
     while op_indices:
@@ -94,10 +98,10 @@ def determine_op_codes(samples):
 def part2(samples, program):
     """ Solution to part 2 """
     op_codes = determine_op_codes(samples)
-    registers = (0, 0, 0, 0)
+    registers = [0, 0, 0, 0]
     for instruction in program:
         op_code = op_codes[instruction[0]]
-        registers = OPS[op_code](registers, instruction)
+        registers = OPS[op_code](registers, instruction[1:])
 
     return registers[0]
 
