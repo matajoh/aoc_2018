@@ -1,5 +1,6 @@
 """ Solution to day 17 of the 2018 Advent of Code """
 
+import logging
 from collections import deque
 
 import numpy as np
@@ -25,7 +26,6 @@ FRAME_SKIP = 2
 DOWN = Point(1, 0)
 LEFT = Point(0, -1)
 RIGHT = Point(0, 1)
-
 
 
 class Drop(Point):
@@ -175,7 +175,7 @@ class Ground:
         self._max_col += 1
         self._cols = self._max_col - self._min_col + 1
 
-    def flow(self, verbose, build_video):
+    def flow(self, build_video):
         """ Flows water through the ground from the spring """
         if build_video:
             state = np.zeros((self._rows, self._cols), np.uint8)
@@ -212,8 +212,8 @@ class Ground:
                     builder.add_frame(state)
                     frame_skip = FRAME_SKIP
 
-            if verbose and self.reachable_tiles - last_report > 5:
-                print(self.reachable_tiles)
+            if self.reachable_tiles - last_report > 5:
+                logging.debug(self.reachable_tiles)
                 last_report = self.reachable_tiles
 
             if outflow:
@@ -224,9 +224,6 @@ class Ground:
 
         if build_video:
             builder.close()
-
-        if verbose:
-            print(self)
 
     def __repr__(self):
         lines = [[SAND for _ in range(self._cols)] for _ in range(self._rows)]
@@ -282,17 +279,33 @@ def parse_repr(lines):
     return "\n".join(text)
 
 
+def test_day17():
+    """ Test for day 17 """
+    lines = read_input(17, True)
+    ground = Ground(parse_input(lines))
+
+    actual = str(ground)
+    expected = parse_repr(lines)
+    assert actual == expected
+
+    ground.flow(False)
+
+    expected = 57
+    actual = ground.reachable_tiles
+    assert actual == expected
+
+    expected = 29
+    actual = ground.remaining_water
+    assert actual == expected
+
+
 def day17():
     """ Solution to day 17 """
     args = parse_args()
-    lines = read_input(17, args.debug).split('\n')
+    lines = read_input(17)
     ground = Ground(parse_input(lines))
-    if args.debug:
-        actual = str(ground)
-        expected = parse_repr(lines)
-        assert actual == expected, "{}\n{}".format(actual, expected)
 
-    ground.flow(args.verbose, args.video)
+    ground.flow(args.video)
 
     with open(temp_file("ground.txt"), "w") as file:
         file.write(str(ground))

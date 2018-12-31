@@ -1,8 +1,10 @@
 """ Solution to day 18 of the 2018 Advent of Code """
 
+import logging
+
 import numpy as np
 
-from utils import read_input, parse_args, VideoBuilder
+from utils import read_input, parse_args, ASCIIVideoBuilder
 
 OPEN_GROUND = ord('.')
 TREES = ord('|')
@@ -10,16 +12,15 @@ LUMBERYARD = ord('#')
 
 COLOR_MAP = {
     OPEN_GROUND: (0, 0, 0),
-    TREES: (13, 55, 13),
-    LUMBERYARD: (55, 27, 7)
+    TREES: (0, 255, 0),
+    LUMBERYARD: (255, 0, 0)
 }
 
 
 class Area:
     """ Class representing the development area """
 
-    def __init__(self, text, build_video=False):
-        lines = [line.strip() for line in text.split('\n')]
+    def __init__(self, lines, build_video=False):
         text = "\n".join(lines)
 
         self.rows = len(lines)
@@ -30,7 +31,7 @@ class Area:
         self._buffer = np.zeros_like(self._acres)
 
         if build_video:
-            self._builder = VideoBuilder(
+            self._builder = ASCIIVideoBuilder(
                 "day18.mp4", self._acres[1:-1, 1:-1], COLOR_MAP)
         else:
             self._builder = None
@@ -45,19 +46,20 @@ class Area:
     def _acre_update(self, row, col):
         """ Determine how the acre at (row col) should update """
         neighbors = self._acres[row:row+3, col:col+3]
-        pos = (row+1, col+1)
-        acre = self._acres[pos]
+        acre = neighbors[1, 1]
         if acre == OPEN_GROUND:
             if np.sum(neighbors == TREES) >= 3:
                 return TREES
 
             return OPEN_GROUND
-        elif acre == TREES:
+
+        if acre == TREES:
             if np.sum(neighbors == LUMBERYARD) >= 3:
                 return LUMBERYARD
 
             return TREES
-        elif acre == LUMBERYARD:
+
+        if acre == LUMBERYARD:
             num_trees = np.sum(neighbors == TREES)
             num_yards = np.sum(neighbors == LUMBERYARD)
             if num_trees and num_yards > 1:
@@ -65,7 +67,7 @@ class Area:
 
             return OPEN_GROUND
 
-        raise ValueError("Invalid value {} at {}".format(acre, pos))
+        raise ValueError("Invalid value {} at {}".format(acre, (row, col)))
 
     def update(self):
         """ Update the area by one minute """
@@ -93,19 +95,18 @@ class Area:
         return np.sum(self._acres == TREES) * np.sum(self._acres == LUMBERYARD)
 
 
-def part1(area, num_minutes, verbose):
-    """ Solution to part 1 """
+def simulate(area, num_minutes):
+    """ Simulate the log-cutting process """
     for minute in range(num_minutes):
-        if verbose:
-            print("\nMinute", minute)
-            print(area)
+        logging.debug("\nMinute %d", minute)
+        logging.debug("%s", area)
 
         area.update()
 
     return area.total_resource_value
 
 
-def find_longest_common_subsequence(values, verbose):
+def find_longest_common_subsequence(values):
     """ Find the longest repeated subsequence in a list """
     max_length = 0
     start = None
@@ -126,14 +127,13 @@ def find_longest_common_subsequence(values, verbose):
         if valid:
             max_length = length
             start = valid
-            if verbose:
-                print("Found sequence of length", length, "at", valid)
+            logging.debug("Found sequence of length %d at %d", length, valid)
 
     return max_length, start
 
 
-def part2(area, num_samples, verbose):
-    """ Solution to part 2 """
+def discover_pattern(area, num_samples):
+    """ Find the pattern in the log-cutting cycle """
     minutes = []
     values = []
     for minute in range(num_samples):
@@ -142,14 +142,12 @@ def part2(area, num_samples, verbose):
 
         area.update()
 
-        if verbose:
-            print(minute, ":", values[-1])
+        logging.debug("%d: %d", minute, values[-1])
 
-    length, start = find_longest_common_subsequence(values, verbose)
+    length, start = find_longest_common_subsequence(values)
     sequence = values[start:start+length]
-    if verbose:
-        print("Found sequence:", sequence)
-        print("Verifying prediction...")
+    logging.debug("Found sequence: %s", sequence)
+    logging.debug("Verifying prediction...")
 
     for test in range(100):
         minute = num_samples + test
@@ -163,27 +161,39 @@ def part2(area, num_samples, verbose):
     return sequence[(1000000000 - start) % length]
 
 
+def test_day18():
+    """ Test for day 18 """
+    lines = read_input(18, True)
+    area = Area(lines)
+
+    expected = 1147
+    actual = simulate(area, 10)
+    assert actual == expected
+
 def day18():
     """ Solution to day 18 """
     args = parse_args()
 
-    text = read_input(18, args.debug)
+    lines = read_input(18)
 
     if args.num_video_frames > 0:
-        area = Area(text, True)
+        area = Area(lines, True)
         num_updates = args.num_video_frames
     else:
-        area = Area(text)
+        area = Area(lines)
         num_updates = 10
 
     print("Part 1")
-    print(part1(area, num_updates, args.verbose))
+    print(simulate(area, num_updates))
 
     area.close()
 
-    area = Area(text)
+    if args.num_video_frames:
+        return
+
+    area = Area(lines)
     print("Part 2")
-    print(part2(area, 1000, args.verbose))
+    print(discover_pattern(area, 600))
 
 
 if __name__ == "__main__":
