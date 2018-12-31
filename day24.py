@@ -1,6 +1,6 @@
 """ Solution to day 24 of the 2018 Advent of Code """
 
-import sys
+import logging
 from collections import namedtuple, deque
 
 from utils import read_input, parse_args, Tokenizer, diff
@@ -79,20 +79,21 @@ class Group:
         """ Returns this group's effective power """
         return self.num_units * self.unit.attack_power
 
-    def attack(self, target, verbose):
+    ATTACK_TEMPLATE = "%s group %d attacks defending group %d, killing %d units"
+
+    def attack(self, target):
         """ Attack the target """
         damage = self.effective_power
         if target.unit.weak_to(self.unit):
             damage *= 2
 
         num_units = target.take_damage(damage)
-        if verbose:
-            print("{} group {} attacks defending group {}, killing {} units".format(
-                self.membership,
-                self.index,
-                target.index,
-                num_units
-            ))
+        logging.debug(Group.ATTACK_TEMPLATE,
+                      self.membership,
+                      self.index,
+                      target.index,
+                      num_units
+                      )
 
     def take_damage(self, damage):
         """ Take damage from an attack """
@@ -111,12 +112,13 @@ class Group:
 
         return False
 
-    def select_target(self, groups, verbose):
+    SELECT_TEMPLATE = "{} group {} would deal defending group {} {} damage"
+
+    def select_target(self, groups):
         """ Select a target to attack """
 
         max_damage = 0
         target = None
-        template = "{} group {} would deal defending group {} {} damage"
         for group in groups:
             damage = self.effective_power
             if group.unit.weak_to(self.unit):
@@ -127,9 +129,8 @@ class Group:
             if damage == 0:
                 continue
 
-            if verbose:
-                print(template.format(self.membership,
-                                      self.index, group.index, damage))
+            logging.debug(Group.SELECT_TEMPLATE, self.membership,
+                          self.index, group.index, damage)
 
             if damage > max_damage:
                 max_damage = damage
@@ -146,7 +147,7 @@ class Group:
         return target
 
     @staticmethod
-    def parse(text, membership, index, verbose):
+    def parse(text, membership, index):
         """ Parse a group from the line of text """
 
         tokens = Tokenizer(text)
@@ -186,8 +187,8 @@ class Group:
         unit = Unit(hit_points, attack_power, attack_type,
                     initiative, set(weaknesses), set(immunities))
         group = Group(unit, num_units, membership, index)
-        if str(group) != text and verbose:
-            print(diff(str(group), text))
+        if str(group) != text:
+            logging.debug(diff(str(group), text))
 
         return group
 
@@ -195,7 +196,7 @@ class Group:
         return "{} units each with {}".format(self.num_units, self.unit)
 
 
-def parse_groups(lines, verbose):
+def parse_groups(lines):
     """ Parse the Immune System and Infection groups from the input """
     if not isinstance(lines, deque):
         lines = deque(lines)
@@ -206,7 +207,7 @@ def parse_groups(lines, verbose):
         line = lines.popleft().strip()
         if line:
             immune.append(Group.parse(
-                line, "Immune System", len(immune) + 1, verbose))
+                line, "Immune System", len(immune) + 1))
         else:
             break
 
@@ -216,7 +217,7 @@ def parse_groups(lines, verbose):
         line = lines.popleft().strip()
         if line:
             infection.append(Group.parse(line, "Infection",
-                                         len(infection) + 1, verbose))
+                                         len(infection) + 1))
         else:
             break
 
@@ -251,10 +252,10 @@ def count_units(army):
     return num_units
 
 
-def selection_phase(immune, infection, verbose):
+def selection_phase(immune, infection):
     """ Have the groups select targets """
-    if verbose:
-        print()
+
+    logging.debug("== SELEcTioN PHASE ==")
 
     groups = immune + infection
     groups = deque(sorted(groups))
@@ -268,7 +269,7 @@ def selection_phase(immune, infection, verbose):
 
     while groups:
         group = groups.popleft()
-        target = group.select_target(targets[group.membership], verbose)
+        target = group.select_target(targets[group.membership])
         if target:
             selections[group] = target
             targets[group.membership].remove(target)
@@ -276,10 +277,9 @@ def selection_phase(immune, infection, verbose):
     return selections
 
 
-def attack_phase(immune, infection, selections, verbose):
+def attack_phase(immune, infection, selections):
     """ Have the groups attack their targets """
-    if verbose:
-        print()
+    logging.debug("== ATTACK PHASE ==")
 
     groups = immune + infection
     groups.sort(key=lambda group: group.unit.initiative, reverse=True)
@@ -288,51 +288,44 @@ def attack_phase(immune, infection, selections, verbose):
     while groups:
         group = groups.popleft()
         if group in selections:
-            group.attack(selections[group], verbose)
+            group.attack(selections[group])
 
     immune = list(filter(lambda group: group.num_units, immune))
     infection = list(filter(lambda group: group.num_units, infection))
     return immune, infection
 
 
-def do_battle(immune, infection, verbose, boost=0):
+def do_battle(immune, infection, boost=0):
     """ Perform a battle until it ends with one side winning or a draw """
-    if verbose:
-        print()
+    logging.debug("=== BATTLE START ===")
 
     if boost:
         for group in immune:
             group.boost(boost)
 
     while immune and infection:
-        if verbose:
-            print(battle_state(immune, infection))
-        else:
-            sys.stdout.write('.')
+        if logging.DEBUG >= logging.root.level:
+            logging.debug(battle_state(immune, infection))
 
         before = count_units(immune) + count_units(infection)
-        selections = selection_phase(immune, infection, verbose)
-        immune, infection = attack_phase(
-            immune, infection, selections, verbose)
+        selections = selection_phase(immune, infection)
+        immune, infection = attack_phase(immune, infection, selections)
 
         after = count_units(immune) + count_units(infection)
 
         if before == after:
-            if verbose:
-                print("STALEMATE")
+            logging.debug("STALEMATE")
 
             break
-
-    if not verbose:
-        sys.stdout.write('\n')
 
     return immune, infection
 
 
-def debug(lines, verbose):
-    """ Debug the logic """
+def test_day24():
+    """ Test for the day 24 solution """
+    lines = read_input(24, True)
     line_queue = deque(lines)
-    immune, infection = parse_groups(line_queue, verbose)
+    immune, infection = parse_groups(line_queue)
 
     expected = []
     while line_queue:
@@ -340,7 +333,7 @@ def debug(lines, verbose):
 
     expected = "\n".join(expected)
 
-    immune, infection = do_battle(immune, infection, verbose)
+    immune, infection = do_battle(immune, infection)
 
     actual = battle_state(immune, infection)
     assert actual == expected, diff(actual, expected)
@@ -349,19 +342,19 @@ def debug(lines, verbose):
     actual = count_units(infection)
     assert actual == expected, "{} != {}".format(actual, expected)
 
-    immune, infection = parse_groups(lines, verbose)
-    immune, infection = do_battle(immune, infection, verbose, 1570)
+    immune, infection = parse_groups(lines)
+    immune, infection = do_battle(immune, infection, 1570)
 
     expected = 51
     actual = count_units(immune)
     assert actual == expected, "{} != {}".format(actual, expected)
 
 
-def part1(lines, verbose):
+def part1(lines):
     """ Solution to part 1 """
-    immune, infection = parse_groups(lines, verbose)
+    immune, infection = parse_groups(lines)
 
-    immune, infection = do_battle(immune, infection, verbose)
+    immune, infection = do_battle(immune, infection)
     if immune:
         return count_units(immune)
 
@@ -371,31 +364,31 @@ def part1(lines, verbose):
     raise ValueError("No winner")
 
 
-def find_boost(lines, start, end, verbose):
+def find_boost(lines, start, end):
     """ Perform a binary search to find the right amount of boost """
-    print("Evaluating range", start, "=>", end)
+    logging.debug("Evaluating range %d => %d", start, end)
     if start + 1 == end:
         return end
 
     boost = (start + end) // 2
-    immune, infection = parse_groups(lines, verbose)
-    immune, infection = do_battle(immune, infection, verbose, boost)
+    immune, infection = parse_groups(lines)
+    immune, infection = do_battle(immune, infection, boost)
 
     if immune and infection:
-        return find_boost(lines, boost, end, verbose)
+        return find_boost(lines, boost, end)
 
     if immune:
-        return find_boost(lines, start, boost, verbose)
+        return find_boost(lines, start, boost)
 
-    return find_boost(lines, boost, end, verbose)
+    return find_boost(lines, boost, end)
 
 
-def part2(lines, verbose):
+def part2(lines):
     """ Solution to part 2 """
-    boost = find_boost(lines, 0, 100, verbose)
+    boost = find_boost(lines, 0, 100)
 
-    immune, infection = parse_groups(lines, verbose)
-    immune, infection = do_battle(immune, infection, verbose, boost)
+    immune, infection = parse_groups(lines)
+    immune, infection = do_battle(immune, infection, boost)
 
     assert immune
     assert not infection
@@ -404,18 +397,15 @@ def part2(lines, verbose):
 
 def day24():
     """ Solution to day 24 """
-    args = parse_args()
+    parse_args()
 
-    lines = read_input(24, args.debug).split('\n')
+    lines = read_input(24)
 
-    if args.debug:
-        debug(lines, args.verbose)
-    else:
-        print("Part 1")
-        print(part1(lines, args.verbose))
+    print("Part 1")
+    print(part1(lines))
 
-        print("Part 2")
-        print(part2(lines, args.verbose))
+    print("Part 2")
+    print(part2(lines))
 
 
 if __name__ == "__main__":

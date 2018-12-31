@@ -2,6 +2,7 @@
 
 from collections import deque, namedtuple
 
+import pytest
 import numpy as np
 
 from utils import read_input, parse_args, diff
@@ -87,28 +88,33 @@ def count_constellations(points):
     return len(constellations)
 
 
-def debug():
-    """ Debut the solution """
-
-    lines = read_input(25, True).split('\n')
+def read_test_tuples():
+    """ Read the test data """
+    lines = read_input(25, True)
     point_sets = list(parse_points(lines))
     expected_counts = [4, 3, 8]
 
-    for point_set, expected in zip(point_sets, expected_counts):
-        actual = count_constellations(point_set)
-        assert actual == expected, "{} != {}".format(actual, expected)
+    return zip(point_sets, expected_counts)
+
+
+TEST_TUPLES = list(read_test_tuples())
+
+
+@pytest.mark.parametrize("point_set, expected", TEST_TUPLES)
+def test_day25(point_set, expected):
+    """ Test the solution """
+
+    actual = count_constellations(point_set)
+    assert actual == expected
 
 
 def day25():
     """ Solution to day 25 """
-    args = parse_args()
-    if args.debug:
-        debug()
-    else:
-        lines = read_input(25).split("\n")
-        points = next(parse_points(lines))
-        print("Part 1")
-        print(count_constellations(points))
+    parse_args()
+    lines = read_input(25)
+    points = next(parse_points(lines))
+    print("Part 1")
+    print(count_constellations(points))
 
 
 if __name__ == "__main__":

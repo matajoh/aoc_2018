@@ -1,5 +1,6 @@
 """ Solution to day 23 of the 2018 Advent of Code """
 
+import logging
 from collections import namedtuple
 
 from utils import read_input, parse_args, diff, PriorityQueue
@@ -100,20 +101,19 @@ def find_strongest(nanobots):
     return strongest
 
 
-def count_in_range(strongest, nanobots, verbose):
+RANGE_TEMPLATE = "The nanobot at %d,%d,%d is distance %d away, and so it is %s"
+
+
+def count_in_range(strongest, nanobots):
     """ Counts the number of nanobots in range of the strongest nanobot """
     num_in_range = 0
     for nanobot in nanobots:
         in_range = strongest.in_range(nanobot)
-        if verbose:
-            print(
-                "The nanoboat at",
-                "{},{},{}".format(nanobot.x, nanobot.y, nanobot.z),
-                "is distance",
-                nanobot - strongest,
-                "away, and so it is",
-                "in range" if in_range else "not in range"
-            )
+        logging.debug(RANGE_TEMPLATE,
+                      nanobot.x, nanobot.y, nanobot.z,
+                      nanobot-strongest,
+                      "in range" if in_range else "not in range")
+
         if in_range:
             num_in_range += 1
 
@@ -140,7 +140,7 @@ def num_bots_for_point(point, nanobots):
     return num_bots
 
 
-def find_max_point(nanobots, verbose):
+def find_max_point(nanobots):
     """ Finds the maximum overlapping point """
     min_dim = nanobots[0].min
     max_dim = min_dim
@@ -163,15 +163,14 @@ def find_max_point(nanobots, verbose):
 
     while queue:
         priority, cube = queue.pop()
-        if verbose:
-            print(cube, "length:", cube.length, "possible:", -priority[0])
+        logging.debug("%s length: %d possible; %d", cube,
+                      cube.length, -priority[0])
 
         assert cube.length
 
         if cube.length == 1:
             num_bots = num_bots_for_point(cube, nanobots)
-            assert - \
-                priority[0] == num_bots, "{} != {}".format(-priority, num_bots)
+            assert -priority[0] == num_bots
             return cube
 
         for part in cube.parts():
@@ -179,61 +178,57 @@ def find_max_point(nanobots, verbose):
             queue.add(part, priority)
 
 
-def debug(nanobots, verbose):
+def test_day23():
     """ Test for day 23 """
+    nanobots = read_nanobots(read_input(23, True))
     strongest = find_strongest(nanobots)
     assert len(strongest) == 1
     strongest = strongest[0]
     assert strongest.radius == 4
 
     expected = 7
-    actual = count_in_range(strongest, nanobots, verbose)
+    actual = count_in_range(strongest, nanobots)
 
     assert actual == expected, "{} != {}".format(actual, expected)
 
     expected = Cube(1, 0, 0, 1)
-    actual = find_max_point(nanobots, verbose)
+    actual = find_max_point(nanobots)
     assert actual == expected, "{} != {}".format(actual, expected)
 
     assert actual.length == actual.x + actual.y + actual.z
 
 
-def part1(nanobots, verbose):
+def part1(nanobots):
     """ Solution to part 1 """
     strongest_bots = find_strongest(nanobots)
-    if verbose:
-        print("found strongest:", strongest_bots)
+    logging.debug("found strongest: %s", strongest_bots)
 
     max_in_range = 0
     for strongest in strongest_bots:
-        num_in_range = count_in_range(strongest, nanobots, verbose)
+        num_in_range = count_in_range(strongest, nanobots)
         if num_in_range > max_in_range:
             max_in_range = num_in_range
 
     return max_in_range
 
 
-def part2(nanobots, verbose):
+def part2(nanobots):
     """ Solution to part 2 """
-    point = find_max_point(nanobots, verbose)
-    return point.length
+    point = find_max_point(nanobots)
+    return point.distance
 
 
 def day23():
     """ Solution to day 23 """
-    args = parse_args()
+    parse_args()
 
-    lines = read_input(23, args.debug).split('\n')
-    nanobots = read_nanobots(lines)
+    nanobots = read_nanobots(read_input(23))
 
-    if args.debug:
-        debug(nanobots, args.verbose)
-    else:
-        print("Part 1")
-        print(part1(nanobots, args.verbose))
+    print("Part 1")
+    print(part1(nanobots))
 
-        print("Part 2")
-        print(part2(nanobots, args.verbose))
+    print("Part 2")
+    print(part2(nanobots))
 
 
 if __name__ == "__main__":
