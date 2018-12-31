@@ -1,6 +1,11 @@
 """ Solution to day 20 of the 2018 Advent of Code """
 
+#pylint: disable=W0621
+
+import logging
 from collections import deque
+
+import pytest
 
 from utils import read_input, parse_args, Point
 
@@ -17,11 +22,10 @@ DIRS = {
     'W': Point(0, -1)
 }
 
-
-def read_debug_tuples():
-    """ Read the debug input/output tuples """
+def read_test_tuples():
+    """ Read the test input/output tuples """
     num_doors = [3, 10, 18, 23, 31]
-    lines = deque([line.strip() for line in read_input(20, True).split('\n')])
+    lines = deque([line.strip() for line in read_input(20, True)])
     case = 0
     while lines:
         regex = lines.popleft()
@@ -36,6 +40,8 @@ def read_debug_tuples():
         yield regex, "\n".join(expected), num_doors[case]
 
         case += 1
+
+TEST_TUPLES = list(read_test_tuples())
 
 
 def move_to(room, direction, rooms, doors):
@@ -161,17 +167,14 @@ def part1(doors):
 
     return max_length
 
-
-def debug_part1():
+@pytest.mark.parametrize("regex, expected_repr, expected_doors", TEST_TUPLES)
+def test_day20_part1(regex, expected_repr, expected_doors):
     """ Debug the part 1 solution """
-    for regex, expected_repr, expected_doors in read_debug_tuples():
-        rooms, doors = create_complex(regex)
-        actual_repr = to_string(rooms, doors)
-        assert actual_repr == expected_repr, "\n{}\n!=\n{}".format(
-            actual_repr, expected_repr)
-        actual_doors = part1(doors)
-        assert actual_doors == expected_doors, "{} != {}".format(
-            actual_doors, expected_doors)
+    rooms, doors = create_complex(regex)
+    actual_repr = to_string(rooms, doors)
+    assert actual_repr == expected_repr
+    actual_doors = part1(doors)
+    assert actual_doors == expected_doors
 
 
 def part2(doors):
@@ -187,21 +190,17 @@ def part2(doors):
 
 def day20():
     """ Solution to day 20 """
-    args = parse_args()
+    parse_args()
 
-    if args.debug:
-        debug_part1()
-    else:
-        regex = read_input(20)
-        rooms, doors = create_complex(regex)
-        print("Part 1")
-        print("Regex:", regex)
-        num_doors = part1(doors)
-        print("Furthest room requires passing", num_doors, "doors")
-        print("\n" + to_string(rooms, doors))
+    regex = read_input(20, no_split=True)
+    rooms, doors = create_complex(regex)
+    print("Part 1")
+    logging.debug("Regex: %s", regex)
+    print(part1(doors))
+    logging.debug(to_string(rooms, doors))
 
-        print("Part 2")
-        print("Num rooms:", part2(doors))
+    print("Part 2")
+    print(part2(doors))
 
 
 if __name__ == "__main__":

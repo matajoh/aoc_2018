@@ -147,13 +147,13 @@ class Cave:
         """ Returns the valid neighbors of a position """
         return position.neighbors(self)
 
-    def find_shortest_path(self, verbose):
+    def find_shortest_path(self):
         """ Finds the shortest path to the target """
         goal = Position(self._target[0], self._target[1], ROCKY, TORCH)
         start = Position(0, 0, ROCKY, TORCH)
 
         search = AStarSearch(heuristic, distance_between, self)
-        return search.find_shortest_path(start, goal, verbose)
+        return search.find_shortest_path(start, goal)
 
 
 def to_string(cave, target, rows, cols):
@@ -173,13 +173,13 @@ def to_string(cave, target, rows, cols):
     return "\n".join(["".join(line) for line in lines])
 
 
-def debug(verbose):
-    """ Debugs the code """
+def test_day22():
+    """ Tests the code """
     depth, (col, row) = DEBUG
     target = row, col
 
     cave = Cave(depth, target)
-    expected = read_input(22, True)
+    expected = read_input(22, True, no_split=True)
     actual = to_string(cave, target, 16, 16)
     assert actual == expected, diff(actual, expected)
 
@@ -188,7 +188,7 @@ def debug(verbose):
     assert actual == expected, "{} != {}".format(actual, expected)
 
     expected = 45
-    path = cave.find_shortest_path(verbose)
+    path = cave.find_shortest_path()
     actual = 0
     current = path[0]
     for pos in path[1:]:
@@ -205,11 +205,11 @@ def part1():
     return cave.compute_total_risk()
 
 
-def part2(verbose):
+def part2():
     """ Solution to part 2 """
     depth, (col, row) = INPUT
     cave = Cave(depth, (row, col))
-    path = cave.find_shortest_path(verbose)
+    path = cave.find_shortest_path()
     time = 0
     current = path[0]
     for pos in path[1:]:
@@ -221,15 +221,13 @@ def part2(verbose):
 
 def day22():
     """ Solution to day 22 """
-    args = parse_args()
-    if args.debug:
-        debug(args.verbose)
-    else:
-        print("Part 1")
-        print(part1())
+    parse_args()
 
-        print("Part 2")
-        print(part2(args.verbose))
+    print("Part 1")
+    print(part1())
+
+    print("Part 2")
+    print(part2())
 
 
 if __name__ == "__main__":
