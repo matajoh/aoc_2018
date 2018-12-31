@@ -2,6 +2,7 @@
 
 import logging
 from collections import deque
+from functools import lru_cache
 
 import numpy as np
 
@@ -47,12 +48,13 @@ class ElfException(Exception):
     def __init__(self):
         super().__init__("Elf Exception")
 
-
+@lru_cache(maxsize=4096)
 def heuristic(first, second):
     """ Manhattan distance heuristic for A-star search """
     return abs(first[0]-second[0]) + abs(first[1]-second[1])
 
 
+@lru_cache(maxsize=4096)
 def neighbors(point):
     """ Return the manhattan neighbors of a point """
     row, col = point
@@ -181,7 +183,7 @@ class Unit:
         return "{}({})".format(chr(self._race), self._health_points)
 
 
-class Battle:
+class Battle: #pylint: disable=R0902
     """ Class representing a battle simulation """
 
     def __init__(self, lines,

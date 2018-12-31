@@ -83,9 +83,9 @@ def build_state_string(pot, states):
 
     if pot is None:
         return "".join(states)
-    else:
-        states.append('#' if pot.has_plant else '.')
-        return build_state_string(pot.next, states)
+
+    states.append('#' if pot.has_plant else '.')
+    return build_state_string(pot.next, states)
 
 
 def count_pots(pot):
@@ -174,7 +174,7 @@ def day12():
     first_pot, rules = parse_input(lines)
     print("Part 1")
     counts = grow_plants(20, first_pot, rules, args.verbose)
-    print("Final count:", counts[-1])
+    print(counts[-1])
 
     first_pot, rules = parse_input(lines)
     print("Part 2")
@@ -186,7 +186,7 @@ def day12():
 
     increase = 50000000000 - x
     count = increase*slope + y
-    print("Final count:", count)
+    print(count)
 
 
 if __name__ == "__main__":

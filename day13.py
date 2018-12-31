@@ -8,12 +8,13 @@ import numpy as np
 from utils import read_input, parse_args, ASCIIVideoBuilder
 
 
+TRACK_MOD = 1000
 NORTH_SOUTH = ord('|')
 EAST_WEST = ord('-')
 NE_CURVE = ord('/')
-SW_CURVE = ord('/') + 1000
+SW_CURVE = ord('/') + TRACK_MOD
 NW_CURVE = ord('\\')
-SE_CURVE = ord('\\') + 1000
+SE_CURVE = ord('\\') + TRACK_MOD
 INTERSECTION = ord('+')
 EMPTY = ord(' ')
 NORTH = ord('^')
@@ -50,31 +51,28 @@ def print_connections(connections):
 VERTICAL_TRACKS = (INTERSECTION, NORTH_SOUTH)
 HORIZONTAL_TRACKS = (INTERSECTION, EAST_WEST)
 
+def determine_track(connections):
+    """ Determine the correct track type based on the connections """
+    track = connections[1, 1]
+    if track == NE_CURVE:
+        vertical = VERTICAL_TRACKS + (NW_CURVE,)
+        horizontal = HORIZONTAL_TRACKS + (NW_CURVE,)
+        if connections[0, 1] in vertical and connections[1, 0] in horizontal:
+            track = SW_CURVE
+        else:
+            assert connections[2, 1] in vertical
+            assert connections[1, 2] in horizontal
 
-class Track:
-    """ Class representing a piece of track """
+    elif track == NW_CURVE:
+        vertical = VERTICAL_TRACKS + (NE_CURVE,)
+        horizontal = HORIZONTAL_TRACKS + (NE_CURVE,)
+        if connections[0, 1] in vertical and connections[1, 2] in horizontal:
+            track = SE_CURVE
+        else:
+            assert connections[2, 1] in vertical
+            assert connections[1, 0] in horizontal
 
-    def __init__(self, connections):
-        self.type = connections[1, 1]
-        if self.type == NE_CURVE:
-            vertical = VERTICAL_TRACKS + (NW_CURVE,)
-            horizontal = HORIZONTAL_TRACKS + (NW_CURVE,)
-            if connections[0, 1] in vertical and connections[1, 0] in horizontal:
-                self.type = SW_CURVE
-            else:
-                assert connections[2, 1] in vertical
-                assert connections[1, 2] in horizontal
-        if self.type == NW_CURVE:
-            vertical = VERTICAL_TRACKS + (NE_CURVE,)
-            horizontal = HORIZONTAL_TRACKS + (NE_CURVE,)
-            if connections[0, 1] in vertical and connections[1, 2] in horizontal:
-                self.type = SE_CURVE
-            else:
-                assert connections[2, 1] in vertical
-                assert connections[1, 0] in horizontal
-
-    def __repr__(self):
-        return chr(self.type % 1000)
+    return track
 
 
 # left, straight, right
@@ -134,21 +132,21 @@ class Cart:
             raise ValueError("Invalid direction")
 
         track = self.tracks[self.row, self.col]
-        if track.type == NE_CURVE:
+        if track == NE_CURVE:
             self._ne_turn()
-        elif track.type == NW_CURVE:
+        elif track == NW_CURVE:
             self._nw_turn()
-        elif track.type == SE_CURVE:
+        elif track == SE_CURVE:
             self._se_turn()
-        elif track.type == SW_CURVE:
+        elif track == SW_CURVE:
             self._sw_turn()
-        elif track.type == INTERSECTION:
+        elif track == INTERSECTION:
             self._intersection()
         else:
             if self.direction in (NORTH, SOUTH):
-                assert track.type == NORTH_SOUTH
+                assert track == NORTH_SOUTH
             elif self.direction in (WEST, EAST):
-                assert track.type == EAST_WEST
+                assert track == EAST_WEST
 
     def _ne_turn(self):
         if self.direction == NORTH:
@@ -196,7 +194,7 @@ def parse_input(lines):
     columns = len(lines[0])
     rows = len(lines)
 
-    tracks = np.zeros((rows, columns), np.dtype(Track))
+    tracks = np.zeros((rows, columns), np.int32)
     track_spec = np.zeros((rows, columns), np.int32)
     carts = []
     for row, line in enumerate(lines):
@@ -215,17 +213,14 @@ def parse_input(lines):
                         'constant', constant_values=EMPTY)
     for row in range(rows):
         for col in range(columns):
-            tracks[row, col] = Track(track_spec[row:row+3, col:col+3])
+            tracks[row, col] = determine_track(track_spec[row:row+3, col:col+3])
 
     return tracks, carts
 
 
 def update_state(state, tracks, carts, collision):
     """ Update the state of the simulation """
-    rows, cols = tracks.shape
-    for row in range(rows):
-        for col in range(cols):
-            state[row, col] = tracks[row, col].type % 1000
+    state[:] = tracks % TRACK_MOD
 
     for cart in carts:
         state[cart.row, cart.col] = cart.direction
@@ -238,7 +233,7 @@ def render_tracks(tracks, carts, collision):
     """ Renders the tracks and carts in ASCII """
     lines = []
     for track_row in tracks:
-        lines.append([str(track) for track in track_row])
+        lines.append([chr(track % TRACK_MOD) for track in track_row])
 
     for cart in carts:
         lines[cart.row][cart.col] = str(cart)
@@ -262,9 +257,9 @@ def do_tick(carts, stop_on_collision):
             if cart.collides_with(other):
                 if stop_on_collision:
                     return cart.col, cart.row
-                else:
-                    collided = other
-                    break
+
+                collided = other
+                break
 
         if collided:
             in_queue.remove(collided)
@@ -274,9 +269,9 @@ def do_tick(carts, stop_on_collision):
             if cart.collides_with(other):
                 if stop_on_collision:
                     return cart.col, cart.row
-                else:
-                    collided = other
-                    break
+
+                collided = other
+                break
 
         if collided:
             carts.remove(collided)

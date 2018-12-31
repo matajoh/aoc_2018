@@ -78,7 +78,7 @@ class Drop(Point):
             self._flowed = True
             return self, Flow(self.row, self.col, False, self), Flow(self.row, self.col, True, self)
 
-        elif down not in flowing and down.row < max_row:
+        if down not in flowing and down.row < max_row:
             return [self, down]
 
         return None
@@ -95,7 +95,7 @@ class Flow(Point):
     def __add__(self, other):
         return Flow(self.row + other.row, self.col + other.col, self._flow_left, self._drop)
 
-    def flow(self, clay, water, flowing, max_row):
+    def flow(self, clay, water, flowing, max_row): #pylint: disable=R0911
         """ Flows the water, resulting in other water objects """
         if self in water:
             if self._flow_left:
@@ -150,7 +150,7 @@ def line_to_points(line):
         raise ValueError("Invalid input: " + line)
 
 
-class Ground:
+class Ground: #pylint: disable=R0902
     """ Class representing the ground and its water table """
 
     def __init__(self, lines):
@@ -175,7 +175,7 @@ class Ground:
         self._max_col += 1
         self._cols = self._max_col - self._min_col + 1
 
-    def flow(self, build_video):
+    def flow(self, build_video): #pylint: disable=R0912
         """ Flows water through the ground from the spring """
         if build_video:
             state = np.zeros((self._rows, self._cols), np.uint8)

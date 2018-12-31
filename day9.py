@@ -136,10 +136,9 @@ class Game:
 @pytest.mark.parametrize("num_players, last_marble, expected", TEST)
 def test_day9(num_players, last_marble, expected):
     """ Test for day 9 """
-    for num_players, last_marble, expected in TEST:
-        game = Game(num_players)
-        actual = game.play(last_marble)
-        assert actual == expected
+    game = Game(num_players)
+    actual = game.play(last_marble)
+    assert actual == expected
 
 
 def day9():

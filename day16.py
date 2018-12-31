@@ -1,7 +1,7 @@
 """ Solution to day 16 of the 2018 Advent of Code """
 
 import logging
-from collections import deque
+from collections import deque, namedtuple
 
 from utils import read_input, parse_args
 from cpu import OPS
@@ -19,20 +19,22 @@ def read_instruction(line):
     return tuple([int(part) for part in parts])
 
 
-class Sample:
+class Sample(namedtuple("Sample", ("index", "before", "args", "after"))):
     """ Class representing a register/instruction sample """
 
-    def __init__(self, lines, index):
+    @staticmethod
+    def parse(lines):
+        """ Parse a sample from the provided lines """
         assert len(lines) == 3
         assert lines[0].startswith("Before:")
         assert lines[2].startswith("After:")
 
-        self.index = index
-        self.before = read_registers(lines[0][8:])
+        before = read_registers(lines[0][8:])
         spec = read_instruction(lines[1])
-        self.index = spec[0]
-        self.args = spec[1:]
-        self.after = read_registers(lines[2][7:])
+        index = spec[0]
+        args = spec[1:]
+        after = read_registers(lines[2][7:])
+        return Sample(index, before, args, after)
 
     def find_matching_ops(self):
         """ Find all operations that match this sample """
@@ -112,14 +114,12 @@ def day16():
 
     samples = []
     lines = deque(read_input(16))
-    index = 0
     while lines[0].startswith("Before:"):
-        sample = Sample([
+        sample = Sample.parse([
             lines.popleft(),
             lines.popleft(),
             lines.popleft()
-        ], index)
-        index += 1
+        ])
 
         lines.popleft()
 
